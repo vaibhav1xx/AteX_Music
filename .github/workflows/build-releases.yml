@@ -41,21 +41,16 @@ jobs:
       - name: Setup Release Keystore (if secrets configured)
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-            cat <<EOF > android/key.properties
-            storePassword=$KEYSTORE_PASSWORD
-            keyPassword=$KEY_PASSWORD
-            keyAlias=$KEY_ALIAS
-            storeFile=upload-keystore.jks
-            EOF
-            echo "Release keystore configured successfully"
+            printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=upload-keystore.jks\n" "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" > android/key.properties
+            echo "Release keystore configured."
           else
-            echo "No keystore secrets found; building with safe debug signing fallback"
+            echo "No release keystore secrets set; falling back to debug signing."
           fi
 
       - name: Build Split APKs (Optimized per ABI)
@@ -240,7 +235,8 @@ jobs:
       - name: Generate SHA-256 Checksums
         run: |
           cd release-assets
-          sha256sum * > SHA256SUMS.txt
+          sha256sum * > ../SHA256SUMS.txt
+          mv ../SHA256SUMS.txt .
           cd ..
 
       - name: Display Release Assets
