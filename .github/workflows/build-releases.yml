@@ -11,10 +11,11 @@ permissions:
 
 jobs:
   # -------------------------------------------------------------
-  # Android & Android TV Build
+  # Android & Android TV Build (Temporarily skipped in v1.0.0; re-enabling in v2.0.0)
   # -------------------------------------------------------------
   build-android:
     name: Build Android & TV APKs
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -202,17 +203,18 @@ jobs:
   # -------------------------------------------------------------
   publish-release:
     name: Publish GitHub Release
-    needs: [build-android, build-windows, build-ios, build-macos]
+    needs: [build-windows, build-ios, build-macos]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Download Android Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: android-apks
-          path: release-assets
+      # Android build is temporarily skipped in v1.0.0; re-enabling in v2.0.0
+      # - name: Download Android Artifacts
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: android-apks
+      #     path: release-assets
 
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v4
@@ -261,15 +263,13 @@ jobs:
 
             | Platform / Device | Recommended Binary | Description |
             | :--- | :--- | :--- |
-            | **Android (Universal)** | `AteX_Music-Android-Universal.apk` | Works on all phones, tablets, car head units, and Android TV |
-            | **Android (Modern Phones)** | `AteX_Music-Android-arm64-v8a.apk` | Optimized smallest size for 64-bit ARM phones (Pixel, Galaxy, OnePlus) |
-            | **Android (Older / 32-bit)** | `AteX_Music-Android-armeabi-v7a.apk` | For older Android devices and legacy hardware |
-            | **Android TV / x86_64** | `AteX_Music-Android-x86_64.apk` | For Intel/AMD Android TV boxes and Chromebooks |
             | **Windows (Installer)** | `AteX_Music-Setup-Windows-x64.exe` | One-click setup wizard with Start Menu and Desktop shortcuts |
             | **Windows (Portable)** | `AteX_Music-Windows-x64-Portable.zip` | Extract and run anywhere without admin rights or installation |
             | **macOS** | `AteX_Music-macOS.zip` | Standalone `.app` bundle for Apple Silicon and Intel Macs |
             | **iOS (Sideload)** | `AteX_Music-iOS-Unsigned.ipa` | Sideload via AltStore, SideStore, TrollStore, or Scarlet |
             | **Checksums** | `SHA256SUMS.txt` | Cryptographic SHA-256 hashes to verify binary integrity |
+
+            > **Note**: Android and Android TV APK builds are temporarily skipped in `v1.0.0` and will be officially enabled in `v2.0.0`.
 
             ---
 
