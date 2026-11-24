@@ -7,6 +7,7 @@ import '../../../data/models/track.dart';
 import '../providers/player_provider.dart';
 import 'album_art_view.dart';
 import 'now_playing_screen.dart';
+import 'now_playing_side_panel.dart';
 import 'playback_effects_sheet.dart';
 import 'track_info_sheet.dart';
 
@@ -49,6 +50,9 @@ class MiniPlayer extends ConsumerWidget {
     );
   }
 
+  // =========================================================================
+  // MOBILE FLOATING MINI-PLAYER (58px, softly tinted + bottom 2px cyan line)
+  // =========================================================================
   Widget _buildMobileFloatingCard(
     BuildContext context,
     WidgetRef ref,
@@ -57,135 +61,143 @@ class MiniPlayer extends ConsumerWidget {
     VoidCallback openNowPlaying,
   ) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 6),
       child: GestureDetector(
         onTap: openNowPlaying,
         child: Container(
-          height: 64,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          height: 58,
           decoration: BoxDecoration(
-            color: AppColors.card.withAlpha(240),
-            borderRadius: BorderRadius.circular(14),
+            color: AppColors.card.withAlpha(245),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.subtleHairline, width: 1),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withAlpha(120),
-                blurRadius: 16,
+                color: Colors.black.withAlpha(140),
+                blurRadius: 14,
                 offset: const Offset(0, 4),
               ),
             ],
           ),
+          clipBehavior: Clip.antiAlias,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(2),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    children: [
+                      // 42x42 album art
+                      AlbumArtView(
+                        imageUrl: track.localCoverPath,
+                        localFilePath: track.localCoverPath,
+                        size: 42,
+                        borderRadius: 6,
+                        placeholderText: track.title,
+                      ),
+                      const SizedBox(width: 10),
+                      // Title & Artist
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              track.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              track.artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Favorite toggle
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          track.isFavorite
+                              ? LucideIcons.heart
+                              : LucideIcons.heart,
+                          color: track.isFavorite
+                              ? AppColors.accent
+                              : AppColors.textMuted,
+                          size: 18,
+                        ),
+                        onPressed: () =>
+                            ref.read(playerProvider.notifier).toggleFavorite(),
+                      ),
+                      const SizedBox(width: 10),
+                      // Play/Pause button
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.playButtonBg,
+                          ),
+                          child: playerState.isResolving
+                              ? const Padding(
+                                  padding: EdgeInsets.all(7),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.playButtonIcon,
+                                  ),
+                                )
+                              : Icon(
+                                  playerState.isPlaying
+                                      ? LucideIcons.pause
+                                      : LucideIcons.play,
+                                  color: AppColors.playButtonIcon,
+                                  size: 16,
+                                ),
+                        ),
+                        onPressed: () =>
+                            ref.read(playerProvider.notifier).togglePlayPause(),
+                      ),
+                      const SizedBox(width: 8),
+                      // Next track button
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(
+                          LucideIcons.skipForward,
+                          color: AppColors.textPrimary,
+                          size: 18,
+                        ),
+                        onPressed: () =>
+                            ref.read(playerProvider.notifier).next(),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Bottom 2px #38BDF8 Electric Cyan progress line
+              SizedBox(
+                height: 2,
                 child: LinearProgressIndicator(
                   value: playerState.progressFraction,
                   minHeight: 2,
                   backgroundColor: Colors.transparent,
                   valueColor: const AlwaysStoppedAnimation<Color>(
-                    AppColors.accent,
+                    AppColors.accent, // #38BDF8
                   ),
-                ),
-              ),
-              Expanded(
-                child: Row(
-                  children: [
-                    AlbumArtView(
-                      imageUrl: track.localCoverPath,
-                      localFilePath: track.localCoverPath,
-                      size: 42,
-                      borderRadius: 6,
-                      placeholderText: track.title,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            track.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            track.artist,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Pro Controls',
-                      icon: const Icon(
-                        LucideIcons.slidersHorizontal,
-                        size: 16,
-                        color: AppColors.textMuted,
-                      ),
-                      onPressed: () => showPlaybackEffectsSheet(context, ref),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        track.isFavorite
-                            ? LucideIcons.heart
-                            : LucideIcons.heart,
-                        color: track.isFavorite
-                            ? AppColors.accent
-                            : AppColors.textMuted,
-                        size: 18,
-                      ),
-                      onPressed: () =>
-                          ref.read(playerProvider.notifier).toggleFavorite(),
-                    ),
-                    IconButton(
-                      icon: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.playButtonBg,
-                        ),
-                        child: playerState.isResolving
-                            ? const Padding(
-                                padding: EdgeInsets.all(7),
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.playButtonIcon,
-                                ),
-                              )
-                            : Icon(
-                                playerState.isPlaying
-                                    ? LucideIcons.pause
-                                    : LucideIcons.play,
-                                color: AppColors.playButtonIcon,
-                                size: 16,
-                              ),
-                      ),
-                      onPressed: () =>
-                          ref.read(playerProvider.notifier).togglePlayPause(),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        LucideIcons.skipForward,
-                        color: AppColors.textPrimary,
-                        size: 18,
-                      ),
-                      onPressed: () => ref.read(playerProvider.notifier).next(),
-                    ),
-                  ],
                 ),
               ),
             ],
@@ -195,6 +207,9 @@ class MiniPlayer extends ConsumerWidget {
     );
   }
 
+  // =========================================================================
+  // DESKTOP DOCK (80px on #09090B with 56x56 art & #38BDF8 seekbar)
+  // =========================================================================
   Widget _buildDesktopDock(
     BuildContext context,
     WidgetRef ref,
@@ -203,19 +218,20 @@ class MiniPlayer extends ConsumerWidget {
     VoidCallback openNowPlaying,
   ) {
     final notifier = ref.read(playerProvider.notifier);
+    final isSidePanelOpen = ref.watch(isNowPlayingSidePanelVisibleProvider);
 
     return Container(
-      height: 84,
+      height: 80,
       decoration: const BoxDecoration(
-        color: AppColors.playerDock,
+        color: AppColors.playerDock, // Deep Obsidian #09090B
         border: Border(
           top: BorderSide(color: AppColors.dockHairline, width: 1.0),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         children: [
-          // Left (30%): 54x54 album art + Title + Artist + Heart toggle
+          // Left: 56x56 rounded-square art + title + artist + favorite toggle
           Expanded(
             flex: 3,
             child: Row(
@@ -227,13 +243,13 @@ class MiniPlayer extends ConsumerWidget {
                     child: AlbumArtView(
                       imageUrl: track.localCoverPath,
                       localFilePath: track.localCoverPath,
-                      size: 54,
+                      size: 56,
                       borderRadius: 8,
                       placeholderText: track.title,
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -249,8 +265,9 @@ class MiniPlayer extends ConsumerWidget {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: AppColors.textPrimary,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
                                 fontSize: 13,
+                                letterSpacing: -0.2,
                               ),
                             ),
                           ),
@@ -259,7 +276,7 @@ class MiniPlayer extends ConsumerWidget {
                             onTap: () => notifier.toggleFavorite(),
                             child: Icon(
                               LucideIcons.heart,
-                              size: 14,
+                              size: 15,
                               color: track.isFavorite
                                   ? AppColors.accent
                                   : AppColors.textMuted,
@@ -275,6 +292,7 @@ class MiniPlayer extends ConsumerWidget {
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 11,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
@@ -284,18 +302,22 @@ class MiniPlayer extends ConsumerWidget {
             ),
           ),
 
-          // Center (40%): Controls + Seekbar
+          // Center: Shuffle, Previous, circular #FFFFFF Play/Pause button with black icon,
+          // Next, Repeat + sleek #38BDF8 seekbar with live timestamps
           Expanded(
             flex: 4,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Top: Controls
+                // Top: Playback Controls
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     IconButton(
                       tooltip: 'Shuffle',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       icon: Icon(
                         LucideIcons.shuffle,
                         size: 15,
@@ -307,6 +329,8 @@ class MiniPlayer extends ConsumerWidget {
                     ),
                     IconButton(
                       tooltip: 'Previous',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       icon: const Icon(
                         LucideIcons.skipBack,
                         color: AppColors.textPrimary,
@@ -315,21 +339,21 @@ class MiniPlayer extends ConsumerWidget {
                       onPressed: () => notifier.previous(),
                     ),
                     const SizedBox(width: 4),
-                    // Crisp 38px circular Play button
+                    // Circular #FFFFFF Play/Pause button with pure black icon
                     GestureDetector(
                       onTap: () => notifier.togglePlayPause(),
                       child: Container(
-                        width: 36,
-                        height: 36,
+                        width: 34,
+                        height: 34,
                         decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          color: AppColors.playButtonBg,
+                          color: AppColors.playButtonBg, // Crisp White #FFFFFF
                         ),
                         child: Center(
                           child: playerState.isResolving
                               ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
+                                  width: 16,
+                                  height: 16,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     color: AppColors.playButtonIcon,
@@ -339,7 +363,7 @@ class MiniPlayer extends ConsumerWidget {
                                   playerState.isPlaying
                                       ? LucideIcons.pause
                                       : LucideIcons.play,
-                                  color: AppColors.playButtonIcon,
+                                  color: AppColors.playButtonIcon, // Black
                                   size: 18,
                                 ),
                         ),
@@ -348,6 +372,8 @@ class MiniPlayer extends ConsumerWidget {
                     const SizedBox(width: 4),
                     IconButton(
                       tooltip: 'Next',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       icon: const Icon(
                         LucideIcons.skipForward,
                         color: AppColors.textPrimary,
@@ -357,6 +383,8 @@ class MiniPlayer extends ConsumerWidget {
                     ),
                     IconButton(
                       tooltip: 'Repeat',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       icon: Icon(
                         playerState.repeatMode == PlaybackRepeatMode.one
                             ? LucideIcons.repeat1
@@ -370,9 +398,9 @@ class MiniPlayer extends ConsumerWidget {
                     ),
                   ],
                 ),
-                // Bottom: Seekbar with timestamps
+                // Bottom: Sleek #38BDF8 Electric Cyan Seekbar with timestamps
                 SizedBox(
-                  height: 18,
+                  height: 14,
                   child: Row(
                     children: [
                       Text(
@@ -386,14 +414,14 @@ class MiniPlayer extends ConsumerWidget {
                         child: SliderTheme(
                           data: SliderTheme.of(context).copyWith(
                             trackHeight: 2.0,
-                            activeTrackColor: AppColors.accent,
+                            activeTrackColor: AppColors.accent, // #38BDF8
                             inactiveTrackColor: AppColors.subtleHairline,
                             thumbColor: Colors.white,
                             thumbShape: const RoundSliderThumbShape(
-                              enabledThumbRadius: 4,
+                              enabledThumbRadius: 3.5,
                             ),
                             overlayShape: const RoundSliderOverlayShape(
-                              overlayRadius: 8,
+                              overlayRadius: 7,
                             ),
                           ),
                           child: Slider(
@@ -426,95 +454,136 @@ class MiniPlayer extends ConsumerWidget {
             ),
           ),
 
-          // Right (30%): Speed/Effects, Track Inspector, Lyrics, Queue, Volume, Fullscreen
+          // Right: Synced Lyrics toggle, Queue toggle, Now Playing panel toggle,
+          // Volume slider, Full-Screen expand (wrapped in FittedBox to eliminate overflows)
           Expanded(
             flex: 3,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  tooltip: 'Speed, Pitch & Sleep Timer',
-                  icon: Icon(
-                    LucideIcons.slidersHorizontal,
-                    size: 16,
-                    color:
-                        (playerState.speed != 1.0 ||
-                            playerState.pitch != 1.0 ||
-                            playerState.skipSilence ||
-                            playerState.sleepTimerMinutesRemaining != null)
-                        ? AppColors.accent
-                        : AppColors.textMuted,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    tooltip: 'Speed, Pitch & Sleep Timer',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    icon: Icon(
+                      LucideIcons.slidersHorizontal,
+                      size: 16,
+                      color:
+                          (playerState.speed != 1.0 ||
+                              playerState.pitch != 1.0 ||
+                              playerState.skipSilence ||
+                              playerState.sleepTimerMinutesRemaining != null)
+                          ? AppColors.accent
+                          : AppColors.textMuted,
+                    ),
+                    onPressed: () => showPlaybackEffectsSheet(context, ref),
                   ),
-                  onPressed: () => showPlaybackEffectsSheet(context, ref),
-                ),
-                IconButton(
-                  tooltip: 'Track Info & Audio Inspector',
-                  icon: const Icon(
-                    LucideIcons.info,
-                    size: 16,
+                  const SizedBox(width: 2),
+                  IconButton(
+                    tooltip: 'Track Info & Audio Inspector',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    icon: const Icon(
+                      LucideIcons.info,
+                      size: 16,
+                      color: AppColors.textMuted,
+                    ),
+                    onPressed: () => showTrackInfoSheet(context, track),
+                  ),
+                  const SizedBox(width: 2),
+                  IconButton(
+                    tooltip: 'Synced Lyrics',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    icon: Icon(
+                      LucideIcons.mic2,
+                      size: 16,
+                      color: playerState.isLyricsVisible
+                          ? AppColors.accent
+                          : AppColors.textMuted,
+                    ),
+                    onPressed: () => notifier.toggleLyrics(),
+                  ),
+                  const SizedBox(width: 2),
+                  IconButton(
+                    tooltip: 'Queue',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    icon: const Icon(
+                      LucideIcons.listMusic,
+                      size: 16,
+                      color: AppColors.textMuted,
+                    ),
+                    onPressed: openNowPlaying,
+                  ),
+                  const SizedBox(width: 2),
+                  IconButton(
+                    tooltip: isSidePanelOpen
+                        ? 'Hide Now Playing Panel'
+                        : 'Show Now Playing Panel',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    icon: Icon(
+                      LucideIcons.panelRightClose,
+                      size: 16,
+                      color: isSidePanelOpen
+                          ? AppColors.accent
+                          : AppColors.textMuted,
+                    ),
+                    onPressed: () {
+                      ref
+                              .read(isNowPlayingSidePanelVisibleProvider.notifier)
+                              .state =
+                          !isSidePanelOpen;
+                    },
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    playerState.volume > 0
+                        ? LucideIcons.volume2
+                        : LucideIcons.volumeX,
                     color: AppColors.textMuted,
-                  ),
-                  onPressed: () => showTrackInfoSheet(context, track),
-                ),
-                IconButton(
-                  tooltip: 'Lyrics',
-                  icon: Icon(
-                    LucideIcons.mic2,
                     size: 16,
-                    color: playerState.isLyricsVisible
-                        ? AppColors.accent
-                        : AppColors.textMuted,
                   ),
-                  onPressed: () => notifier.toggleLyrics(),
-                ),
-                IconButton(
-                  tooltip: 'Queue',
-                  icon: const Icon(
-                    LucideIcons.listMusic,
-                    size: 16,
-                    color: AppColors.textMuted,
-                  ),
-                  onPressed: openNowPlaying,
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  playerState.volume > 0
-                      ? LucideIcons.volume2
-                      : LucideIcons.volumeX,
-                  color: AppColors.textMuted,
-                  size: 16,
-                ),
-                SizedBox(
-                  width: 72,
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 2.5,
-                      activeTrackColor: Colors.white,
-                      inactiveTrackColor: AppColors.subtleHairline,
-                      thumbColor: Colors.white,
-                      thumbShape: const RoundSliderThumbShape(
-                        enabledThumbRadius: 3,
+                  SizedBox(
+                    width: 60,
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 2.5,
+                        activeTrackColor: Colors.white,
+                        inactiveTrackColor: AppColors.subtleHairline,
+                        thumbColor: Colors.white,
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 3,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 6,
+                        ),
                       ),
-                      overlayShape: const RoundSliderOverlayShape(
-                        overlayRadius: 6,
+                      child: Slider(
+                        value: playerState.volume,
+                        onChanged: (val) => notifier.setVolume(val),
                       ),
                     ),
-                    child: Slider(
-                      value: playerState.volume,
-                      onChanged: (val) => notifier.setVolume(val),
+                  ),
+                  const SizedBox(width: 2),
+                  IconButton(
+                    tooltip: 'Full-Screen Now Playing',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    icon: const Icon(
+                      LucideIcons.maximize2,
+                      color: AppColors.textMuted,
+                      size: 16,
                     ),
+                    onPressed: openNowPlaying,
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Full-Screen Now Playing',
-                  icon: const Icon(
-                    LucideIcons.maximize2,
-                    color: AppColors.textMuted,
-                    size: 16,
-                  ),
-                  onPressed: openNowPlaying,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

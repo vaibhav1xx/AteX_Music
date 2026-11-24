@@ -13,12 +13,12 @@ class ITunesSearchService {
     return url.replaceAll(RegExp(r'\d+x\d+bb'), '${size}x${size}bb');
   }
 
-  Future<List<Track>> search(String query, {int limit = 25}) async {
+  Future<List<Track>> search(String query, {int limit = 20, String country = 'IN'}) async {
     if (query.trim().isEmpty) return [];
 
     try {
       final encoded = Uri.encodeComponent(query.trim());
-      final url = 'https://itunes.apple.com/search?term=$encoded&media=music&entity=song&limit=$limit';
+      final url = 'https://itunes.apple.com/search?term=$encoded&country=$country&media=music&entity=song&limit=$limit';
       final response = await _dio.get(url);
 
       if (response.statusCode == 200 && response.data != null) {

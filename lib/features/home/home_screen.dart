@@ -5,7 +5,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/shimmer_skeleton.dart';
-import '../../core/widgets/track_action_menu.dart';
 import '../../data/database/app_database.dart';
 import '../../data/models/radio_station.dart';
 import '../../data/models/track.dart';
@@ -17,7 +16,7 @@ import '../player/providers/player_provider.dart';
 import '../player/widgets/album_art_view.dart';
 import '../podcast/widgets/podcast_episodes_sheet.dart';
 
-enum HomeSegment { music, radio, podcasts }
+enum HomeCategory { all, music, radio, podcasts }
 
 class HomeScreen extends ConsumerStatefulWidget {
   final VoidCallback onOpenLibrary;
@@ -36,8 +35,15 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  HomeSegment _selectedSegment = HomeSegment.music;
+  HomeCategory _selectedCategory = HomeCategory.all;
   bool _isScanning = false;
+
+  String _getTimeGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
 
   Future<void> _triggerScan() async {
     setState(() => _isScanning = true);
@@ -65,12 +71,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.sizeOf(context).width >= 700;
+    final selectedCountry = ref.watch(regionCountryProvider);
+    final isIndia = selectedCountry == 'in';
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // Ambient Radial Glow at top
+          // Subtle top ambient gradient wash (tinted softly by Electric Cyan #38BDF8)
           Positioned(
             top: -120,
             left: 0,
@@ -81,10 +89,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
                     center: Alignment.topCenter,
-                    radius: 1.2,
+                    radius: 1.1,
                     colors: [
-                      const Color(0xFF0369A1).withAlpha(45),
-                      const Color(0xFF0C4A6E).withAlpha(15),
+                      AppColors.accent.withAlpha(45),
+                      const Color(0xFF0369A1).withAlpha(20),
                       Colors.transparent,
                     ],
                   ),
@@ -95,55 +103,91 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
           CustomScrollView(
             slivers: [
-              // Header & Quick Action
+              // Header Row: Time-of-day greeting + India/Global toggle + Actions
               SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
-                    isDesktop ? 36 : 20,
-                    isDesktop ? 28 : 20,
-                    isDesktop ? 36 : 20,
+                    isDesktop ? 32 : 18,
+                    isDesktop ? 24 : 16,
+                    isDesktop ? 32 : 18,
                     12,
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // Greeting
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
+                          children: [
                             Text(
-                              'Explore',
-                              style: TextStyle(
+                              _getTimeGreeting(),
+                              style: const TextStyle(
                                 color: AppColors.textPrimary,
-                                fontSize: 26,
+                                fontSize: 24,
                                 fontWeight: FontWeight.w800,
-                                letterSpacing: -0.6,
+                                letterSpacing: -0.5,
                               ),
                             ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Offline Music • Keyless Live Radio • Keyless Podcasts',
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Discover Indian-first audio, keyless radio & podcasts',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 13,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
                         ),
                       ),
+
+                      // India / Global Storefront Toggle
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.subtleHairline),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildRegionButton(
+                              label: 'India 🇮🇳',
+                              isSelected: isIndia,
+                              onTap: () =>
+                                  ref
+                                          .read(regionCountryProvider.notifier)
+                                          .state =
+                                      'in',
+                            ),
+                            _buildRegionButton(
+                              label: 'Global 🌐',
+                              isSelected: !isIndia,
+                              onTap: () =>
+                                  ref
+                                          .read(regionCountryProvider.notifier)
+                                          .state =
+                                      'us',
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(width: 8),
+
+                      // Import Button
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.cardHover,
                           foregroundColor: AppColors.textPrimary,
                           elevation: 0,
                           padding: EdgeInsets.symmetric(
-                            horizontal: isDesktop ? 14 : 10,
-                            vertical: 10,
+                            horizontal: isDesktop ? 12 : 10,
+                            vertical: 8,
                           ),
+                          minimumSize: const Size(0, 34),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
@@ -160,7 +204,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               )
                             : const Icon(
                                 LucideIcons.folderDown,
-                                size: 16,
+                                size: 15,
                                 color: AppColors.accent,
                               ),
                         label: Text(
@@ -168,87 +212,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ? '...'
                               : (isDesktop ? 'Import Music' : 'Import'),
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                      if (widget.onOpenStats != null) ...[
-                        const SizedBox(width: 8),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.cardHover,
-                            foregroundColor: AppColors.textPrimary,
-                            elevation: 0,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isDesktop ? 14 : 10,
-                              vertical: 10,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                          onPressed: widget.onOpenStats,
-                          icon: const Icon(
-                            LucideIcons.flame,
-                            size: 16,
-                            color: Color(0xFFFF5722),
-                          ),
-                          label: Text(
-                            isDesktop ? 'AteX Rewind' : 'Rewind',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
               ),
 
-              // Segment Pill Selector (Music / Radio / Podcasts)
+              // Category Pills (All, Music, Radio, Podcasts)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.symmetric(
-                    horizontal: isDesktop ? 36 : 20,
-                    vertical: 8,
+                    horizontal: isDesktop ? 32 : 18,
+                    vertical: 6,
                   ),
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _buildPillTab(
-                          HomeSegment.music,
-                          LucideIcons.music,
-                          'Music',
-                        ),
+                        _buildCategoryPill(HomeCategory.all, 'All'),
                         const SizedBox(width: 8),
-                        _buildPillTab(
-                          HomeSegment.radio,
-                          LucideIcons.radio,
-                          'Live Radio',
-                        ),
+                        _buildCategoryPill(HomeCategory.music, 'Music'),
                         const SizedBox(width: 8),
-                        _buildPillTab(
-                          HomeSegment.podcasts,
-                          LucideIcons.podcast,
-                          'Podcasts',
-                        ),
+                        _buildCategoryPill(HomeCategory.radio, 'Live Radio'),
+                        const SizedBox(width: 8),
+                        _buildCategoryPill(HomeCategory.podcasts, 'Podcasts'),
                       ],
                     ),
                   ),
                 ),
               ),
 
-              // Dynamic Segment Content
-              if (_selectedSegment == HomeSegment.music)
-                ..._buildMusicSlivers(isDesktop)
-              else if (_selectedSegment == HomeSegment.radio)
-                ..._buildRadioSlivers(isDesktop)
-              else
-                ..._buildPodcastSlivers(isDesktop),
+              // Content according to selected Category
+              if (_selectedCategory == HomeCategory.all ||
+                  _selectedCategory == HomeCategory.music)
+                ..._buildMusicSection(isDesktop),
+
+              if (_selectedCategory == HomeCategory.all ||
+                  _selectedCategory == HomeCategory.radio)
+                ..._buildRadioSection(isDesktop),
+
+              if (_selectedCategory == HomeCategory.all ||
+                  _selectedCategory == HomeCategory.podcasts)
+                ..._buildPodcastSection(isDesktop),
 
               const SliverToBoxAdapter(child: SizedBox(height: 120)),
             ],
@@ -258,70 +267,94 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildPillTab(HomeSegment segment, IconData icon, String title) {
-    final isSelected = _selectedSegment == segment;
+  Widget _buildRegionButton({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
-      onTap: () => setState(() => _selectedSegment = segment),
+      onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.black : AppColors.textSecondary,
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryPill(HomeCategory cat, String label) {
+    final isSelected = _selectedCategory == cat;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedCategory = cat),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.accent : AppColors.card,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected ? AppColors.accent : AppColors.subtleHairline,
-            width: 1.0,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isSelected ? Colors.black : AppColors.textSecondary,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              title,
-              style: TextStyle(
-                color: isSelected ? Colors.black : AppColors.textPrimary,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ],
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.black : AppColors.textPrimary,
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          ),
         ),
       ),
     );
   }
 
   // =========================================================================
-  // MUSIC SECTION (Offline Tracks + Charts)
+  // MUSIC SECTION: Quick Picks 2-Row Grid + Indian-First Shelves
   // =========================================================================
-  List<Widget> _buildMusicSlivers(bool isDesktop) {
+  List<Widget> _buildMusicSection(bool isDesktop) {
     final playerNotifier = ref.read(playerProvider.notifier);
     final dbTracksAsync = ref.watch(allTracksStreamProvider);
     final trendingSongsAsync = ref.watch(trendingSongsProvider);
+    final bollywoodHitsAsync = ref.watch(bollywoodHitsProvider);
+    final punjabiHitsAsync = ref.watch(punjabiHitsProvider);
+    final desiHipHopAsync = ref.watch(desiHipHopProvider);
     final trendingAlbumsAsync = ref.watch(trendingAlbumsProvider);
 
     final localTracks =
         dbTracksAsync.valueOrNull?.map((d) => d.toDomain()).toList() ?? [];
     final trendingSongs = trendingSongsAsync.valueOrNull ?? [];
+    final bollywoodHits = bollywoodHitsAsync.valueOrNull ?? [];
+    final punjabiHits = punjabiHitsAsync.valueOrNull ?? [];
+    final desiHipHop = desiHipHopAsync.valueOrNull ?? [];
     final trendingAlbums = trendingAlbumsAsync.valueOrNull ?? [];
 
+    // Signature 6-track 2-row Quick Picks
     final quickPicks = localTracks.isNotEmpty
         ? localTracks.take(6).toList()
         : trendingSongs.take(6).toList();
 
+    final isIndia = ref.watch(regionCountryProvider) == 'in';
+
     return [
+      // 1. Signature 2-Row Quick Picks Grid
       if (quickPicks.isNotEmpty) ...[
         SliverToBoxAdapter(
           child: Padding(
             padding: EdgeInsets.fromLTRB(
-              isDesktop ? 36 : 20,
-              16,
-              isDesktop ? 36 : 20,
+              isDesktop ? 32 : 18,
+              14,
+              isDesktop ? 32 : 18,
               8,
             ),
             child: const Text(
@@ -337,10 +370,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         SliverPadding(
           padding: EdgeInsets.fromLTRB(
-            isDesktop ? 36 : 20,
-            8,
-            isDesktop ? 36 : 20,
-            20,
+            isDesktop ? 32 : 18,
+            4,
+            isDesktop ? 32 : 18,
+            16,
           ),
           sliver: SliverGrid(
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -351,7 +384,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             delegate: SliverChildBuilderDelegate((context, index) {
               final track = quickPicks[index];
-              return _QuickPickTile(
+              return _SpotifyQuickPickTile(
                 track: track,
                 onPlay: () => playerNotifier.playTrack(track),
               );
@@ -360,149 +393,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ],
 
-      // Local Music Storage Banner
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 36 : 20,
-            vertical: 8,
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withAlpha(30),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    LucideIcons.hardDrive,
-                    color: AppColors.accent,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        localTracks.isNotEmpty
-                            ? '${localTracks.length} Offline Tracks Stored on Device'
-                            : 'Zero Cloud Dependency • Offline Local Storage',
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        localTracks.isNotEmpty
-                            ? 'Indexed in local SQLite database with zero tracking.'
-                            : 'Scan folders on your computer or phone to build your offline library.',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textPrimary,
-                    side: const BorderSide(color: AppColors.subtleHairline),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                  ),
-                  onPressed: widget.onOpenLibrary,
-                  child: const Text(
-                    'View Library',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      // 2. Shelf: Trending in India / Global Trending
+      _buildShelfHeader(
+        isDesktop: isDesktop,
+        title: isIndia ? 'Trending in India' : 'Global Most Played',
+        subtitle: isIndia
+            ? 'Top chartbusters across India'
+            : 'Real-time global charts',
       ),
-
-      // Global Trending Charts
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            isDesktop ? 36 : 20,
-            24,
-            isDesktop ? 36 : 20,
-            12,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Global Trending',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    Text(
-                      'Real-time most played songs',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (widget.onOpenSearch != null)
-                TextButton(
-                  onPressed: widget.onOpenSearch,
-                  child: const Text(
-                    'Search More',
-                    style: TextStyle(color: AppColors.accent, fontSize: 13),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-
       SliverToBoxAdapter(
         child: trendingSongs.isNotEmpty
             ? SizedBox(
-                height: 228,
+                height: 244,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: EdgeInsets.symmetric(
-                    horizontal: isDesktop ? 36 : 20,
+                    horizontal: isDesktop ? 32 : 18,
                   ),
                   itemCount: trendingSongs.length,
                   separatorBuilder: (ctx, i) => const SizedBox(width: 16),
                   itemBuilder: (context, index) {
                     final track = trendingSongs[index];
-                    return _SongCard(
+                    return _SpotifySquareAlbumCard(
                       track: track,
                       onPlay: () => playerNotifier.playTrack(track),
                     );
@@ -510,217 +422,153 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               )
             : (trendingSongsAsync.isLoading
-                ? SizedBox(
-                    height: 228,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isDesktop ? 36 : 20,
+                  ? SizedBox(
+                      height: 244,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isDesktop ? 32 : 18,
+                        ),
+                        child: const ShimmerHorizontalCharts(),
                       ),
-                      child: const ShimmerHorizontalCharts(),
-                    ),
-                  )
-                : Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isDesktop ? 36 : 20,
-                    ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final isNarrow = constraints.maxWidth < 600;
-                        if (isNarrow) {
-                          return Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: AppColors.card,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.subtleHairline),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.cardHover,
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Icon(
-                                        LucideIcons.wifiOff,
-                                        size: 20,
-                                        color: AppColors.textMuted,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    const Expanded(
-                                      child: Text(
-                                        'Offline Mode Active',
-                                        style: TextStyle(
-                                          color: AppColors.textPrimary,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 15,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Connect to Wi-Fi to load trending charts, or enjoy your local library with zero internet.',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.playButtonBg,
-                                      foregroundColor: AppColors.playButtonIcon,
-                                      elevation: 0,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 14,
-                                        vertical: 10,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                    onPressed: _isScanning ? null : _triggerScan,
-                                    icon: const Icon(
-                                      LucideIcons.folderDown,
-                                      size: 14,
-                                    ),
-                                    label: const Text(
-                                      'Scan Music',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        return Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: AppColors.card,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.subtleHairline),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: AppColors.cardHover,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  LucideIcons.wifiOff,
-                                  size: 24,
-                                  color: AppColors.textMuted,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              const Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      'Offline Mode Active',
-                                      style: TextStyle(
-                                        color: AppColors.textPrimary,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 15,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      'Connect to Wi-Fi to load trending charts, or enjoy your local library with zero internet.',
-                                      style: TextStyle(
-                                        color: AppColors.textSecondary,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.playButtonBg,
-                                  foregroundColor: AppColors.playButtonIcon,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 10,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                onPressed: _isScanning ? null : _triggerScan,
-                                icon: const Icon(
-                                  LucideIcons.folderDown,
-                                  size: 14,
-                                ),
-                                label: const Text(
-                                  'Scan Music',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  )),
+                    )
+                  : const SizedBox.shrink()),
       ),
 
+      // 3. Shelf: Bollywood Chartbusters
+      _buildShelfHeader(
+        isDesktop: isDesktop,
+        title: 'Bollywood Chartbusters',
+        subtitle: 'The biggest Hindi film melodies & blockbuster hits',
+      ),
+      SliverToBoxAdapter(
+        child: bollywoodHits.isNotEmpty
+            ? SizedBox(
+                height: 244,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isDesktop ? 32 : 18,
+                  ),
+                  itemCount: bollywoodHits.length,
+                  separatorBuilder: (ctx, i) => const SizedBox(width: 16),
+                  itemBuilder: (context, index) {
+                    final track = bollywoodHits[index];
+                    return _SpotifySquareAlbumCard(
+                      track: track,
+                      onPlay: () => playerNotifier.playTrack(track),
+                    );
+                  },
+                ),
+              )
+            : (bollywoodHitsAsync.isLoading
+                  ? SizedBox(
+                      height: 244,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isDesktop ? 32 : 18,
+                        ),
+                        child: const ShimmerHorizontalCharts(),
+                      ),
+                    )
+                  : const SizedBox.shrink()),
+      ),
+
+      // 4. Shelf: Punjabi Hits
+      _buildShelfHeader(
+        isDesktop: isDesktop,
+        title: 'Punjabi Hits & Fire',
+        subtitle: 'Bhangra, urban Punjabi bass & high-energy anthems',
+      ),
+      SliverToBoxAdapter(
+        child: punjabiHits.isNotEmpty
+            ? SizedBox(
+                height: 244,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isDesktop ? 32 : 18,
+                  ),
+                  itemCount: punjabiHits.length,
+                  separatorBuilder: (ctx, i) => const SizedBox(width: 16),
+                  itemBuilder: (context, index) {
+                    final track = punjabiHits[index];
+                    return _SpotifySquareAlbumCard(
+                      track: track,
+                      onPlay: () => playerNotifier.playTrack(track),
+                    );
+                  },
+                ),
+              )
+            : (punjabiHitsAsync.isLoading
+                  ? SizedBox(
+                      height: 244,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isDesktop ? 32 : 18,
+                        ),
+                        child: const ShimmerHorizontalCharts(),
+                      ),
+                    )
+                  : const SizedBox.shrink()),
+      ),
+
+      // 5. Shelf: Desi Hip-Hop
+      _buildShelfHeader(
+        isDesktop: isDesktop,
+        title: 'Desi Hip-Hop & Rap',
+        subtitle: 'Gully rap, drill, and underground Indian street flow',
+      ),
+      SliverToBoxAdapter(
+        child: desiHipHop.isNotEmpty
+            ? SizedBox(
+                height: 244,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isDesktop ? 32 : 18,
+                  ),
+                  itemCount: desiHipHop.length,
+                  separatorBuilder: (ctx, i) => const SizedBox(width: 16),
+                  itemBuilder: (context, index) {
+                    final track = desiHipHop[index];
+                    return _SpotifySquareAlbumCard(
+                      track: track,
+                      onPlay: () => playerNotifier.playTrack(track),
+                    );
+                  },
+                ),
+              )
+            : (desiHipHopAsync.isLoading
+                  ? SizedBox(
+                      height: 244,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isDesktop ? 32 : 18,
+                        ),
+                        child: const ShimmerHorizontalCharts(),
+                      ),
+                    )
+                  : const SizedBox.shrink()),
+      ),
+
+      // 6. Shelf: Trending Albums
       if (trendingAlbums.isNotEmpty) ...[
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              isDesktop ? 36 : 20,
-              28,
-              isDesktop ? 36 : 20,
-              12,
-            ),
-            child: const Text(
-              'Trending Albums',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.3,
-              ),
-            ),
-          ),
+        _buildShelfHeader(
+          isDesktop: isDesktop,
+          title: 'Trending Albums',
+          subtitle: 'Featured full-length releases',
         ),
         SliverToBoxAdapter(
           child: SizedBox(
-            height: 224,
+            height: 236,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: isDesktop ? 36 : 20),
+              padding: EdgeInsets.symmetric(horizontal: isDesktop ? 32 : 18),
               itemCount: trendingAlbums.length,
               separatorBuilder: (ctx, i) => const SizedBox(width: 16),
               itemBuilder: (context, index) {
                 final album = trendingAlbums[index];
-                return _AlbumCard(album: album);
+                return _AlbumCardItem(album: album);
               },
             ),
           ),
@@ -729,110 +577,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ];
   }
 
+  Widget _buildShelfHeader({
+    required bool isDesktop,
+    required String title,
+    required String subtitle,
+  }) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          isDesktop ? 32 : 18,
+          26,
+          isDesktop ? 32 : 18,
+          12,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // =========================================================================
-  // LIVE RADIO SECTION (Keyless Free Radio Browser API)
+  // RADIO SECTION (Keyless Free Radio Browser API)
   // =========================================================================
-  List<Widget> _buildRadioSlivers(bool isDesktop) {
+  List<Widget> _buildRadioSection(bool isDesktop) {
     final topRadioAsync = ref.watch(topRadioStationsProvider);
     final indiaRadioAsync = ref.watch(indiaRadioStationsProvider);
-    final lofiRadioAsync = ref.watch(lofiRadioStationsProvider);
-    final electronicRadioAsync = ref.watch(electronicRadioStationsProvider);
 
     return [
-      // Top Global Live Stations
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            isDesktop ? 36 : 20,
-            16,
-            isDesktop ? 36 : 20,
-            10,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
-                'Top Global Live Radio',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              Text(
-                'Radio Browser API • Free & Keyless',
-                style: TextStyle(
-                  color: AppColors.accent,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      SliverToBoxAdapter(
-        child: SizedBox(
-          height: 180,
-          child: topRadioAsync.when(
-            data: (stations) => ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: isDesktop ? 36 : 20),
-              itemCount: stations.length,
-              separatorBuilder: (ctx, i) => const SizedBox(width: 14),
-              itemBuilder: (context, index) =>
-                  _RadioStationCard(station: stations[index]),
-            ),
-            loading: () => const Center(
-              child: CircularProgressIndicator(color: AppColors.accent),
-            ),
-            error: (_, _) => Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(
-                      LucideIcons.wifiOff,
-                      size: 16,
-                      color: AppColors.textMuted,
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      'Live Radio stations require an active internet connection.',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-
-      // India Live Stations
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            isDesktop ? 36 : 20,
-            24,
-            isDesktop ? 36 : 20,
-            10,
-          ),
-          child: const Text(
-            'India Popular Broadcasts',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.3,
-            ),
-          ),
-        ),
+      _buildShelfHeader(
+        isDesktop: isDesktop,
+        title: 'India Live Radio Broadcasts',
+        subtitle: 'AIR, Vividh Bharati, Mirchi & top regional FM stations',
       ),
       SliverToBoxAdapter(
         child: SizedBox(
@@ -840,96 +635,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: indiaRadioAsync.when(
             data: (stations) => ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: isDesktop ? 36 : 20),
+              padding: EdgeInsets.symmetric(horizontal: isDesktop ? 32 : 18),
               itemCount: stations.length,
               separatorBuilder: (ctx, i) => const SizedBox(width: 14),
               itemBuilder: (context, index) =>
-                  _RadioStationCard(station: stations[index]),
+                  _RadioStationCardItem(station: stations[index]),
             ),
             loading: () => const Center(
               child: CircularProgressIndicator(color: AppColors.accent),
             ),
-            error: (err, _) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
           ),
         ),
       ),
-
-      // Lo-Fi & Chill Stations
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            isDesktop ? 36 : 20,
-            24,
-            isDesktop ? 36 : 20,
-            10,
-          ),
-          child: const Text(
-            'Lo-Fi & Study Streams',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.3,
-            ),
-          ),
-        ),
+      _buildShelfHeader(
+        isDesktop: isDesktop,
+        title: 'Top Global Radio Stations',
+        subtitle: 'Free and keyless live streams from around the globe',
       ),
       SliverToBoxAdapter(
         child: SizedBox(
           height: 180,
-          child: lofiRadioAsync.when(
+          child: topRadioAsync.when(
             data: (stations) => ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: isDesktop ? 36 : 20),
+              padding: EdgeInsets.symmetric(horizontal: isDesktop ? 32 : 18),
               itemCount: stations.length,
               separatorBuilder: (ctx, i) => const SizedBox(width: 14),
               itemBuilder: (context, index) =>
-                  _RadioStationCard(station: stations[index]),
+                  _RadioStationCardItem(station: stations[index]),
             ),
             loading: () => const Center(
               child: CircularProgressIndicator(color: AppColors.accent),
             ),
-            error: (err, _) => const SizedBox.shrink(),
-          ),
-        ),
-      ),
-
-      // Electronic & Dance Stations
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            isDesktop ? 36 : 20,
-            24,
-            isDesktop ? 36 : 20,
-            10,
-          ),
-          child: const Text(
-            'Electronic & EDM Radio',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.3,
-            ),
-          ),
-        ),
-      ),
-      SliverToBoxAdapter(
-        child: SizedBox(
-          height: 180,
-          child: electronicRadioAsync.when(
-            data: (stations) => ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: isDesktop ? 36 : 20),
-              itemCount: stations.length,
-              separatorBuilder: (ctx, i) => const SizedBox(width: 14),
-              itemBuilder: (context, index) =>
-                  _RadioStationCard(station: stations[index]),
-            ),
-            loading: () => const Center(
-              child: CircularProgressIndicator(color: AppColors.accent),
-            ),
-            error: (err, _) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
           ),
         ),
       ),
@@ -937,48 +676,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   // =========================================================================
-  // PODCASTS SECTION (Keyless iTunes Search & RSS XML)
+  // PODCASTS SECTION
   // =========================================================================
-  List<Widget> _buildPodcastSlivers(bool isDesktop) {
+  List<Widget> _buildPodcastSection(bool isDesktop) {
     final popularPodcastsAsync = ref.watch(popularPodcastsProvider);
 
     return [
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            isDesktop ? 36 : 20,
-            16,
-            isDesktop ? 36 : 20,
-            12,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
-                'Featured Podcasts',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              Text(
-                'Keyless iTunes RSS • 1-Tap Offline Download',
-                style: TextStyle(
-                  color: AppColors.accent,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
+      _buildShelfHeader(
+        isDesktop: isDesktop,
+        title: 'Featured Podcasts & Shows',
+        subtitle: '1-tap offline download & streaming',
       ),
-
       popularPodcastsAsync.when(
         data: (podcasts) => SliverPadding(
-          padding: EdgeInsets.symmetric(horizontal: isDesktop ? 36 : 20),
+          padding: EdgeInsets.symmetric(horizontal: isDesktop ? 32 : 18),
           sliver: SliverGrid(
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: isDesktop ? 4 : 2,
@@ -1041,45 +752,275 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: CircularProgressIndicator(color: AppColors.accent),
           ),
         ),
-        error: (_, _) => SliverToBoxAdapter(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(
-                    LucideIcons.wifiOff,
-                    size: 16,
-                    color: AppColors.textMuted,
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Podcasts require an active internet connection to refresh episodes.',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
       ),
     ];
   }
 }
 
-/// Radio Station Card with 1-tap live streaming & local favorite toggle
-class _RadioStationCard extends ConsumerWidget {
+/// Spotify's signature 56px Quick Pick Tile with circular #38BDF8 Play Button on hover
+class _SpotifyQuickPickTile extends StatefulWidget {
+  final Track track;
+  final VoidCallback onPlay;
+
+  const _SpotifyQuickPickTile({required this.track, required this.onPlay});
+
+  @override
+  State<_SpotifyQuickPickTile> createState() => _SpotifyQuickPickTileState();
+}
+
+class _SpotifyQuickPickTileState extends State<_SpotifyQuickPickTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onPlay,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          decoration: BoxDecoration(
+            color: _hovered ? AppColors.cardHover : AppColors.card,
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: _hovered
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(60),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              // Left square 56px cover art
+              ClipRRect(
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(6),
+                ),
+                child: AlbumArtView(
+                  imageUrl: widget.track.localCoverPath,
+                  localFilePath: widget.track.localCoverPath,
+                  size: 56,
+                  borderRadius: 0,
+                  placeholderText: widget.track.title,
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Bold title
+              Expanded(
+                child: Text(
+                  widget.track.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              // Circular #38BDF8 play button appearing on hover with subtle shadow
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 120),
+                opacity: _hovered ? 1.0 : 0.0,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.accent, // Electric Cyan #38BDF8
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.accent.withAlpha(80),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      LucideIcons.play,
+                      color: Colors.black,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Spotify 165x165 Square Album Card with bottom-right hover-reveal circular #38BDF8 play button
+class _SpotifySquareAlbumCard extends StatefulWidget {
+  final Track track;
+  final VoidCallback onPlay;
+
+  const _SpotifySquareAlbumCard({required this.track, required this.onPlay});
+
+  @override
+  State<_SpotifySquareAlbumCard> createState() =>
+      _SpotifySquareAlbumCardState();
+}
+
+class _SpotifySquareAlbumCardState extends State<_SpotifySquareAlbumCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 165,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: widget.onPlay,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 165x165 Square Artwork
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: AlbumArtView(
+                      imageUrl: widget.track.localCoverPath,
+                      localFilePath: widget.track.localCoverPath,
+                      size: 165,
+                      borderRadius: 8,
+                      showShadow: true,
+                      placeholderText: widget.track.title,
+                    ),
+                  ),
+                  // Bottom-right hover-reveal circular #38BDF8 play button
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 140),
+                      opacity: _hovered ? 1.0 : 0.0,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.accent, // Electric Cyan #38BDF8
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(120),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          LucideIcons.play,
+                          color: Colors.black,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Title
+              Text(
+                widget.track.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 2),
+              // 2-line artist metadata
+              Text(
+                widget.track.artist,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Album Card Item for ChartAlbum
+class _AlbumCardItem extends StatelessWidget {
+  final ChartAlbum album;
+
+  const _AlbumCardItem({required this.album});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 165,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AlbumArtView(
+            imageUrl: album.artworkUrl,
+            size: 165,
+            borderRadius: 8,
+            showShadow: true,
+            placeholderText: album.name,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            album.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            album.artist,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 11,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Radio Station Card Item
+class _RadioStationCardItem extends ConsumerWidget {
   final RadioStation station;
-  const _RadioStationCard({required this.station});
+  const _RadioStationCardItem({required this.station});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playerNotifier = ref.read(playerProvider.notifier);
-    final db = ref.read(appDatabaseProvider);
 
     return SizedBox(
       width: 140,
@@ -1088,7 +1029,7 @@ class _RadioStationCard extends ConsumerWidget {
           playerNotifier.playTrack(station.toTrack());
           AppToast.show(
             context,
-            'Streaming live: "${station.name}"',
+            'Streaming: "${station.name}"',
             icon: LucideIcons.radio,
           );
         },
@@ -1102,32 +1043,11 @@ class _RadioStationCard extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Stack(
-                children: [
-                  AlbumArtView(
-                    imageUrl: station.favicon,
-                    size: 120,
-                    borderRadius: 8,
-                    placeholderText: station.name,
-                  ),
-                  Positioned(
-                    right: 6,
-                    bottom: 6,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        color: AppColors.playButtonBg,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        LucideIcons.play,
-                        color: AppColors.playButtonIcon,
-                        size: 16,
-                      ),
-                    ),
-                  ),
-                ],
+              AlbumArtView(
+                imageUrl: station.favicon,
+                size: 120,
+                borderRadius: 8,
+                placeholderText: station.name,
               ),
               const SizedBox(height: 8),
               Text(
@@ -1140,318 +1060,18 @@ class _RadioStationCard extends ConsumerWidget {
                   fontSize: 12,
                 ),
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      station.country,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () async {
-                      await db.toggleRadioStationFavorite(
-                        uuid: station.stationUuid,
-                        name: station.name,
-                        url: station.urlResolved.isNotEmpty
-                            ? station.urlResolved
-                            : station.url,
-                        favicon: station.favicon,
-                        tags: station.tags,
-                        country: station.country,
-                        bitrate: station.bitrate,
-                      );
-                      if (!context.mounted) return;
-                      AppToast.show(
-                        context,
-                        'Updated favorite station: "${station.name}"',
-                        icon: LucideIcons.heart,
-                      );
-                    },
-                    child: const Icon(
-                      LucideIcons.heart,
-                      size: 14,
-                      color: AppColors.accent,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Compact 56px Quick Pick Tile with hover-reveal Play button
-class _QuickPickTile extends StatefulWidget {
-  final Track track;
-  final VoidCallback onPlay;
-
-  const _QuickPickTile({required this.track, required this.onPlay});
-
-  @override
-  State<_QuickPickTile> createState() => _QuickPickTileState();
-}
-
-class _QuickPickTileState extends State<_QuickPickTile> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onPlay,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.cardHover : AppColors.card,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              AlbumArtView(
-                imageUrl: widget.track.localCoverPath,
-                localFilePath: widget.track.localCoverPath,
-                size: 56,
-                borderRadius: 8,
-                placeholderText: widget.track.title,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.track.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      widget.track.artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (_hovered)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Consumer(
-                      builder: (ctx, ref, _) => IconButton(
-                        icon: const Icon(
-                          LucideIcons.ellipsisVertical,
-                          size: 16,
-                          color: AppColors.textMuted,
-                        ),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () =>
-                            showTrackActionMenu(context, ref, widget.track),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.playButtonBg,
-                        ),
-                        child: const Icon(
-                          LucideIcons.play,
-                          color: AppColors.playButtonIcon,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              else
-                const SizedBox(width: 12),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Song Card with floating hover play button
-class _SongCard extends StatefulWidget {
-  final Track track;
-  final VoidCallback onPlay;
-
-  const _SongCard({required this.track, required this.onPlay});
-
-  @override
-  State<_SongCard> createState() => _SongCardState();
-}
-
-class _SongCardState extends State<_SongCard> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 148,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          onTap: widget.onPlay,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                children: [
-                  AlbumArtView(
-                    imageUrl: widget.track.localCoverPath,
-                    localFilePath: widget.track.localCoverPath,
-                    size: 148,
-                    borderRadius: 8,
-                    showShadow: true,
-                    placeholderText: widget.track.title,
-                  ),
-                  if (_hovered)
-                    Positioned(
-                      right: 8,
-                      bottom: 8,
-                      child: Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.playButtonBg,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(100),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          LucideIcons.play,
-                          color: AppColors.playButtonIcon,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.track.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                  Consumer(
-                    builder: (ctx, ref, _) => GestureDetector(
-                      onTap: () =>
-                          showTrackActionMenu(context, ref, widget.track),
-                      child: const Icon(
-                        LucideIcons.ellipsisVertical,
-                        size: 14,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
               Text(
-                widget.track.artist,
+                station.country,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
+                  color: AppColors.textMuted,
+                  fontSize: 10,
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Album Card
-class _AlbumCard extends StatelessWidget {
-  final ChartAlbum album;
-
-  const _AlbumCard({required this.album});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 148,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AlbumArtView(
-            imageUrl: album.artworkUrl,
-            size: 148,
-            borderRadius: 8,
-            showShadow: true,
-            placeholderText: album.name,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            album.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            album.artist,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 11,
-            ),
-          ),
-        ],
       ),
     );
   }

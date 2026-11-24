@@ -57,38 +57,39 @@ class AudioStreamResolver {
 
     // 3. Search and resolve full-length audio stream
     try {
-      final query = '${track.title} ${track.artist} official audio'.trim();
-      debugPrint('[AudioStreamResolver] Searching: "$query"');
+      VideoId? targetVideoId;
+      Duration? targetDuration;
 
-      final searchResults = await _yt.search
-          .search(query)
-          .timeout(const Duration(seconds: 8));
-
-      final videos = searchResults.whereType<Video>().toList();
-      if (videos.isEmpty) {
-        debugPrint('[AudioStreamResolver] No video matches for "$query", falling back');
-        return _fallbackUrl(track);
+      if (track.id.startsWith('yt:')) {
+        final rawId = track.id.substring(3);
+        try {
+          targetVideoId = VideoId(rawId);
+        } catch (_) {}
       }
 
-      final video = videos.first;
-      StreamManifest? manifest;
+      if (targetVideoId == null) {
+        final query = '${track.title} ${track.artist} official audio'.trim();
+        debugPrint('[AudioStreamResolver] Searching: "$query"');
 
-      // Try primary clients: AndroidVR & Safari as specified
-      try {
-        manifest = await _yt.videos.streams.getManifest(
-          video.id,
-          ytClients: [
-            YoutubeApiClient.androidVr,
-            YoutubeApiClient.safari,
-          ],
-        ).timeout(const Duration(seconds: 8));
-      } catch (clientErr) {
-        debugPrint('[AudioStreamResolver] Primary clients failed ($clientErr), trying fallback client');
-        // Fallback to default client
-        manifest = await _yt.videos.streams
-            .getManifest(video.id)
+        final searchResults = await _yt.search
+            .search(query)
             .timeout(const Duration(seconds: 8));
+
+        final videos = searchResults.whereType<Video>().toList();
+        if (videos.isEmpty) {
+          debugPrint('[AudioStreamResolver] No video matches for "$query", falling back');
+          return _fallbackUrl(track);
+        }
+
+        targetVideoId = videos.first.id;
+        targetDuration = videos.first.duration;
       }
+
+      debugPrint('[AudioStreamResolver] Fetching manifest for video ID: $targetVideoId');
+      // Use default client set for reliable playback without 403 errors
+      final manifest = await _yt.videos.streams
+          .getManifest(targetVideoId)
+          .timeout(const Duration(seconds: 8));
 
       // Extract highest bitrate audioOnly stream (M4A or Opus)
       final audioStreams = manifest.audioOnly;
@@ -100,7 +101,7 @@ class AudioStreamResolver {
         _cache[cacheKey] = _StreamCacheEntry(
           streamUrl: streamUrl,
           expiresAt: DateTime.now().add(_cacheTtl),
-          duration: video.duration,
+          duration: targetDuration,
         );
 
         debugPrint('[AudioStreamResolver] Resolved "${track.title}" -> ${(bestAudio.bitrate.bitsPerSecond / 1000).round()} kbps (${bestAudio.container.name})');
@@ -114,7 +115,7 @@ class AudioStreamResolver {
         _cache[cacheKey] = _StreamCacheEntry(
           streamUrl: streamUrl,
           expiresAt: DateTime.now().add(_cacheTtl),
-          duration: video.duration,
+          duration: targetDuration,
         );
         return streamUrl;
       }

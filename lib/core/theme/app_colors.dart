@@ -4,19 +4,27 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  // Obsidian Surfaces
-  static const Color sidebar = Color(0xFF09090B); // Clean dark sidebar
-  static const Color canvas = Color(0xFF111114); // Main deep canvas
+  // Obsidian Surfaces (Spotify Desktop Card-Panel Caliber in AteX Obsidian + Electric Cyan)
+  static const Color sidebar = Color(
+    0xFF09090B,
+  ); // Deep Obsidian outer background & rail
+  static const Color canvas = Color(
+    0xFF111114,
+  ); // Rounded main content & library panel surface
   static const Color card = Color(0xFF16161B); // Borderless card surface
   static const Color cardHover = Color(0xFF1E1E26); // Elevated card hover
   static const Color cardActive = Color(0xFF252530);
-  static const Color playerDock = Color(0xFF0C0C0F); // 84px bottom player dock
-  static const Color dockHairline = Color(0xFF222228); // Subtle 1px dock top hairline
+  static const Color playerDock = Color(0xFF09090B); // 80px bottom player dock
+  static const Color dockHairline = Color(
+    0xFF1F1F24,
+  ); // Subtle dock top hairline
   static const Color surfaceElevated = Color(0xFF18181D);
 
   // Border & Hairlines
   static const Color subtleHairline = Color(0xFF1F1F24);
-  static const Color pillFill = Color(0x1AFFFFFF); // Translucent active tab pill
+  static const Color pillFill = Color(
+    0x1AFFFFFF,
+  ); // Translucent active tab pill
 
   // Primary Buttons (Spotify / Apple Music style)
   static const Color playButtonBg = Color(0xFFFFFFFF); // Crisp white
@@ -28,8 +36,12 @@ class AppColors {
 
   // Typography
   static const Color textPrimary = Color(0xFFF4F4F5); // Crisp primary text
-  static const Color textSecondary = Color(0xFFA1A1AA); // Muted artist/metadata text
-  static const Color textMuted = Color(0xFF71717A); // Tertiary timestamps/labels
+  static const Color textSecondary = Color(
+    0xFFA1A1AA,
+  ); // Muted artist/metadata text
+  static const Color textMuted = Color(
+    0xFF71717A,
+  ); // Tertiary timestamps/labels
 
   // Legacy backwards-compatibility aliases
   static const Color electricCyan = accent;
