@@ -1,51 +1,46 @@
 import 'package:flutter/material.dart';
 
-/// Design tokens for AteX Music
-/// Deep OLED black (#07090E), translucent frosted glass, electric cyan & cobalt accents.
+/// Studio Obsidian Design Tokens (Apple Music / Tidal / Spotify Desktop Caliber)
 class AppColors {
   AppColors._();
 
-  // Core Backgrounds
-  static const Color oledBlack = Color(0xFF07090E);
+  // Obsidian Surfaces
+  static const Color sidebar = Color(0xFF09090B); // Clean dark sidebar
+  static const Color canvas = Color(0xFF111114); // Main deep canvas
+  static const Color card = Color(0xFF16161B); // Borderless card surface
+  static const Color cardHover = Color(0xFF1E1E26); // Elevated card hover
+  static const Color cardActive = Color(0xFF252530);
+  static const Color playerDock = Color(0xFF0C0C0F); // 84px bottom player dock
+  static const Color dockHairline = Color(0xFF222228); // Subtle 1px dock top hairline
+  static const Color surfaceElevated = Color(0xFF18181D);
+
+  // Border & Hairlines
+  static const Color subtleHairline = Color(0xFF1F1F24);
+  static const Color pillFill = Color(0x1AFFFFFF); // Translucent active tab pill
+
+  // Primary Buttons (Spotify / Apple Music style)
+  static const Color playButtonBg = Color(0xFFFFFFFF); // Crisp white
+  static const Color playButtonIcon = Color(0xFF09090B); // Pure black
+
+  // Accent (Restrained: active seekbar, active tab, active karaoke lyric lines)
+  static const Color accent = Color(0xFF38BDF8); // Electric sky blue
+  static const Color accentGlow = Color(0x3338BDF8);
+
+  // Typography
+  static const Color textPrimary = Color(0xFFF4F4F5); // Crisp primary text
+  static const Color textSecondary = Color(0xFFA1A1AA); // Muted artist/metadata text
+  static const Color textMuted = Color(0xFF71717A); // Tertiary timestamps/labels
+
+  // Legacy backwards-compatibility aliases
+  static const Color electricCyan = accent;
+  static const Color deepCobalt = Color(0xFF0284C7);
+  static const Color oledBlack = canvas;
   static const Color pureBlack = Color(0xFF000000);
-  static const Color surfaceDark = Color(0xFF0F141F);
-  static const Color surfaceElevated = Color(0xFF161C2C);
-
-  // Frosted Glass Surfaces (translucent ~5% white with subtle borders)
-  static const Color cardGlass = Color(0x0DFFFFFF); // rgba(255, 255, 255, 0.05)
-  static const Color cardGlassHover = Color(0x1AFFFFFF); // rgba(255, 255, 255, 0.10)
-  static const Color cardGlassPressed = Color(0x26FFFFFF); // rgba(255, 255, 255, 0.15)
-  static const Color glassBorder = Color(0x1FFFFFFF); // rgba(255, 255, 255, 0.12)
-  static const Color glassBorderSubtle = Color(0x0FFFFFFF);
-
-  // Accents
-  static const Color electricCyan = Color(0xFF00E5FF);
-  static const Color deepCobalt = Color(0xFF2979FF);
-  static const Color neonBlue = Color(0xFF00B0FF);
-  static const Color vibrantPurple = Color(0xFF7C4DFF);
-
-  // Accent Gradients
-  static const LinearGradient brandGradient = LinearGradient(
-    colors: [electricCyan, deepCobalt],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  static const LinearGradient glassGradient = LinearGradient(
-    colors: [
-      Color(0x1AFFFFFF),
-      Color(0x08FFFFFF),
-    ],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  // Text Colors
-  static const Color textPrimary = Color(0xFFFFFFFF);
-  static const Color textSecondary = Color(0xFF8E9BAE);
-  static const Color textTertiary = Color(0xFF4A5568);
-
-  // Android TV & Keyboard Focus Rings
-  static const Color tvFocusBorder = electricCyan;
-  static const Color tvFocusGlow = Color(0x6600E5FF);
+  static const Color surfaceDark = canvas;
+  static const Color cardGlass = card;
+  static const Color cardGlassHover = cardHover;
+  static const Color glassBorder = subtleHairline;
+  static const Color glassBorderSubtle = dockHairline;
+  static const Color tvFocusBorder = accent;
+  static const Color tvFocusGlow = accentGlow;
 }

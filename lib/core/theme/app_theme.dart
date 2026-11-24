@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 class AppTheme {
   AppTheme._();
 
   static ThemeData get darkTheme {
+    final baseTextTheme = GoogleFonts.plusJakartaSansTextTheme();
+
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: AppColors.oledBlack,
-      canvasColor: AppColors.oledBlack,
-      primaryColor: AppColors.electricCyan,
+      scaffoldBackgroundColor: AppColors.canvas,
+      canvasColor: AppColors.canvas,
+      primaryColor: AppColors.accent,
       colorScheme: const ColorScheme.dark(
-        primary: AppColors.electricCyan,
-        onPrimary: AppColors.pureBlack,
-        secondary: AppColors.deepCobalt,
-        onSecondary: AppColors.textPrimary,
-        surface: AppColors.surfaceDark,
+        primary: AppColors.accent,
+        onPrimary: AppColors.playButtonIcon,
+        surface: AppColors.card,
         onSurface: AppColors.textPrimary,
       ),
       appBarTheme: const AppBarTheme(
@@ -26,51 +27,54 @@ class AppTheme {
         scrolledUnderElevation: 0,
         titleTextStyle: TextStyle(
           color: AppColors.textPrimary,
-          fontSize: 20,
+          fontSize: 18,
           fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
+          letterSpacing: -0.3,
         ),
-        iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
       sliderTheme: const SliderThemeData(
-        activeTrackColor: AppColors.electricCyan,
+        activeTrackColor: AppColors.accent,
         inactiveTrackColor: Color(0x26FFFFFF),
-        thumbColor: AppColors.electricCyan,
-        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
-        overlayColor: Color(0x2900E5FF),
-        overlayShape: RoundSliderOverlayShape(overlayRadius: 14),
-        trackHeight: 3.5,
+        thumbColor: Color(0xFFFFFFFF),
+        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5),
+        overlayShape: RoundSliderOverlayShape(overlayRadius: 10),
+        trackHeight: 3.0,
       ),
-      iconTheme: const IconThemeData(
-        color: AppColors.textPrimary,
-      ),
-      textTheme: const TextTheme(
-        displayLarge: TextStyle(
+      textTheme: baseTextTheme.copyWith(
+        displayLarge: baseTextTheme.displayLarge?.copyWith(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.w800,
-          letterSpacing: -0.5,
+          letterSpacing: -1.0,
         ),
-        headlineMedium: TextStyle(
+        headlineLarge: baseTextTheme.headlineLarge?.copyWith(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.8,
+        ),
+        headlineMedium: baseTextTheme.headlineMedium?.copyWith(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.w700,
-          letterSpacing: -0.2,
+          letterSpacing: -0.5,
         ),
-        titleLarge: TextStyle(
+        titleLarge: baseTextTheme.titleLarge?.copyWith(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.3,
+        ),
+        titleMedium: baseTextTheme.titleMedium?.copyWith(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.w600,
+          letterSpacing: -0.2,
         ),
-        titleMedium: TextStyle(
+        bodyLarge: baseTextTheme.bodyLarge?.copyWith(
           color: AppColors.textPrimary,
-          fontWeight: FontWeight.w500,
+          letterSpacing: -0.1,
         ),
-        bodyLarge: TextStyle(
-          color: AppColors.textPrimary,
-        ),
-        bodyMedium: TextStyle(
+        bodyMedium: baseTextTheme.bodyMedium?.copyWith(
           color: AppColors.textSecondary,
         ),
-        bodySmall: TextStyle(
-          color: AppColors.textTertiary,
+        bodySmall: baseTextTheme.bodySmall?.copyWith(
+          color: AppColors.textMuted,
         ),
       ),
     );

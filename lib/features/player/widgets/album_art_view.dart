@@ -1,91 +1,132 @@
+import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../core/theme/app_colors.dart';
 
 class AlbumArtView extends StatelessWidget {
-  final int gradientIndex;
+  final String? imageUrl;
+  final String? localFilePath;
   final double size;
   final double borderRadius;
-  final bool showGlow;
-  final IconData? fallbackIcon;
+  final bool showShadow;
+  final String? placeholderText;
 
   const AlbumArtView({
     super.key,
-    required this.gradientIndex,
-    this.size = 52,
-    this.borderRadius = 12,
-    this.showGlow = false,
-    this.fallbackIcon,
+    this.imageUrl,
+    this.localFilePath,
+    this.size = 54,
+    this.borderRadius = 8,
+    this.showShadow = false,
+    this.placeholderText,
+    int? gradientIndex, // kept for legacy optional param
   });
-
-  static const List<List<Color>> gradients = [
-    [Color(0xFF00E5FF), Color(0xFF2979FF)], // Electric Cyan -> Cobalt
-    [Color(0xFF00F2FE), Color(0xFF4FACFE)], // Azure
-    [Color(0xFFFF0844), Color(0xFFFFB199)], // Crimson Cyber
-    [Color(0xFF8A2387), Color(0xFFE94057)], // Deep Purple & Pink
-    [Color(0xFF11998E), Color(0xFF38EF7D)], // Neon Mint Emerald
-    [Color(0xFFF12711), Color(0xFFF5AF19)], // Solar Flare
-  ];
 
   @override
   Widget build(BuildContext context) {
-    final colors = gradients[gradientIndex % gradients.length];
+    Widget imageContent;
 
-    Widget art = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(borderRadius),
-        gradient: LinearGradient(
-          colors: colors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(
-          color: Colors.white.withAlpha(40),
-          width: 1,
-        ),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Background subtle pattern circle
-          Positioned(
-            right: -size * 0.2,
-            bottom: -size * 0.2,
-            child: Container(
-              width: size * 0.8,
-              height: size * 0.8,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withAlpha(25),
-              ),
-            ),
-          ),
-          Icon(
-            fallbackIcon ?? Icons.graphic_eq_rounded,
-            size: size * 0.44,
-            color: Colors.white.withAlpha(230),
-          ),
-        ],
+    if (imageUrl != null && imageUrl!.startsWith('http')) {
+      imageContent = CachedNetworkImage(
+        imageUrl: imageUrl!,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => _buildPlaceholder(),
+        errorWidget: (context, url, error) => _buildPlaceholder(),
+      );
+    } else if (localFilePath != null && File(localFilePath!).existsSync()) {
+      imageContent = Image.file(
+        File(localFilePath!),
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (ctx, err, stack) => _buildPlaceholder(),
+      );
+    } else {
+      imageContent = _buildPlaceholder();
+    }
+
+    Widget container = ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: imageContent,
       ),
     );
 
-    if (showGlow) {
+    if (showShadow) {
       return Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(borderRadius),
           boxShadow: [
             BoxShadow(
-              color: colors.first.withAlpha(90),
+              color: Colors.black.withAlpha(120),
               blurRadius: size * 0.35,
-              spreadRadius: 2,
-              offset: const Offset(0, 4),
+              offset: const Offset(0, 6),
             ),
           ],
         ),
-        child: art,
+        child: container,
       );
     }
 
-    return art;
+    return container;
   }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: AppColors.cardHover,
+        borderRadius: BorderRadius.circular(borderRadius),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Subtle concentric vinyl grooves
+          CustomPaint(
+            size: Size(size, size),
+            painter: _VinylGroovePainter(),
+          ),
+          if (placeholderText != null && placeholderText!.isNotEmpty)
+            Text(
+              placeholderText!.substring(0, 1).toUpperCase(),
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: size * 0.38,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          else
+            Icon(
+              LucideIcons.disc,
+              size: size * 0.42,
+              color: AppColors.textMuted,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VinylGroovePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final paint = Paint()
+      ..color = Colors.white.withAlpha(8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    canvas.drawCircle(center, size.width * 0.38, paint);
+    canvas.drawCircle(center, size.width * 0.26, paint);
+    canvas.drawCircle(center, size.width * 0.14, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

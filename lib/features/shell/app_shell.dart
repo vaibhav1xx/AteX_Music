@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/atex_monogram.dart';
-import '../../core/widgets/focusable_card.dart';
-import '../../core/widgets/frosted_glass.dart';
-import '../../core/widgets/responsive_layout.dart';
+import '../../core/widgets/desktop_title_bar.dart';
 import '../home/home_screen.dart';
 import '../library/library_screen.dart';
 import '../player/providers/player_provider.dart';
@@ -36,14 +35,34 @@ class _AppShellState extends ConsumerState<AppShell> {
         const SingleActivator(LogicalKeyboardKey.arrowLeft, control: true): () {
           ref.read(playerProvider.notifier).previous();
         },
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): () {
+          setState(() => _currentIndex = 1);
+        },
       },
       child: FocusScope(
         autofocus: true,
         child: Scaffold(
-          backgroundColor: AppColors.oledBlack,
-          body: ResponsiveLayout(
-            mobile: (context, constraints) => _buildMobileLayout(context),
-            desktop: (context, constraints) => _buildDesktopLayout(context),
+          backgroundColor: AppColors.canvas,
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              final isDesktop = constraints.maxWidth >= 700;
+              return Column(
+                children: [
+                  // Integrated Frameless Desktop Drag Titlebar (Windows & macOS on desktop widths)
+                  if (DesktopTitleBar.isSupported && isDesktop)
+                    DesktopTitleBar(
+                      onSearchTap: () => setState(() => _currentIndex = 1),
+                    ),
+
+                  // Main Responsive Layout
+                  Expanded(
+                    child: isDesktop
+                        ? _buildDesktopLayout(context)
+                        : _buildMobileLayout(context),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -53,7 +72,10 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget _buildCurrentPage() {
     switch (_currentIndex) {
       case 0:
-        return HomeScreen(onOpenLibrary: () => setState(() => _currentIndex = 2));
+        return HomeScreen(
+          onOpenLibrary: () => setState(() => _currentIndex = 2),
+          onOpenSearch: () => setState(() => _currentIndex = 1),
+        );
       case 1:
         return const SearchScreen();
       case 2:
@@ -61,20 +83,22 @@ class _AppShellState extends ConsumerState<AppShell> {
       case 3:
         return const SettingsScreen();
       default:
-        return HomeScreen(onOpenLibrary: () => setState(() => _currentIndex = 2));
+        return HomeScreen(
+          onOpenLibrary: () => setState(() => _currentIndex = 2),
+          onOpenSearch: () => setState(() => _currentIndex = 1),
+        );
     }
   }
 
-  // Mobile Layout (< 700px): Bottom nav + Floating Mini-Player
+  // Mobile Layout (< 700px): Bottom Nav + Floating Mini-Player
   Widget _buildMobileLayout(BuildContext context) {
     return Stack(
       children: [
-        // Content Area
         Positioned.fill(
           child: _buildCurrentPage(),
         ),
 
-        // Floating Frosted Mini-Player & Frosted Bottom Navigation Bar
+        // Floating Mini-Player & Bottom Nav
         Positioned(
           left: 0,
           right: 0,
@@ -82,22 +106,22 @@ class _AppShellState extends ConsumerState<AppShell> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Floating Mini-Player
               const MiniPlayer(isDesktopDock: false),
-
-              // Frosted Bottom Nav
-              FrostedGlass(
-                height: 64,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                backgroundColor: const Color(0x330B0F19),
-                borderColor: AppColors.glassBorderSubtle,
+              Container(
+                height: 60,
+                decoration: const BoxDecoration(
+                  color: AppColors.sidebar,
+                  border: Border(
+                    top: BorderSide(color: AppColors.dockHairline, width: 1.0),
+                  ),
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildBottomNavItem(0, Icons.home_rounded, 'Home'),
-                    _buildBottomNavItem(1, Icons.search_rounded, 'Search'),
-                    _buildBottomNavItem(2, Icons.library_music_rounded, 'Library'),
-                    _buildBottomNavItem(3, Icons.settings_rounded, 'Settings'),
+                    _buildBottomNavItem(0, LucideIcons.home, 'Home'),
+                    _buildBottomNavItem(1, LucideIcons.search, 'Search'),
+                    _buildBottomNavItem(2, LucideIcons.library, 'Library'),
+                    _buildBottomNavItem(3, LucideIcons.settings, 'Settings'),
                   ],
                 ),
               ),
@@ -118,14 +142,14 @@ class _AppShellState extends ConsumerState<AppShell> {
         children: [
           Icon(
             icon,
-            color: isSelected ? AppColors.electricCyan : AppColors.textSecondary,
-            size: 24,
+            color: isSelected ? AppColors.textPrimary : AppColors.textMuted,
+            size: 20,
           ),
           const SizedBox(height: 3),
           Text(
             label,
             style: TextStyle(
-              color: isSelected ? AppColors.electricCyan : AppColors.textSecondary,
+              color: isSelected ? AppColors.textPrimary : AppColors.textMuted,
               fontSize: 10,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             ),
@@ -135,79 +159,77 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
-  // Desktop / TV Layout (>= 700px): Left Sidebar + Persistent Bottom Dock
+  // Desktop / Tablet / TV Layout (>= 700px): Clean Sidebar + 84px Bottom Dock
   Widget _buildDesktopLayout(BuildContext context) {
     return Column(
       children: [
         Expanded(
           child: Row(
             children: [
-              // Left Frosted Sidebar
-              FrostedGlass(
-                width: 250,
-                borderRadius: BorderRadius.zero,
-                backgroundColor: const Color(0x220B0F19),
-                borderColor: AppColors.glassBorderSubtle,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              // Clean Studio Sidebar (#09090B)
+              Container(
+                width: 230,
+                color: AppColors.sidebar,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Brand Header
-                    Row(
-                      children: const [
-                        AteXMonogram(size: 32),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'AteX Music',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      child: Row(
+                        children: const [
+                          AteXMonogram(size: 24, showGlow: false),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'AteX Music',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.4,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 28),
-
-                    // Nav Links
-                    _buildSidebarItem(0, Icons.home_rounded, 'Home'),
-                    const SizedBox(height: 6),
-                    _buildSidebarItem(1, Icons.search_rounded, 'Search'),
-                    const SizedBox(height: 6),
-                    _buildSidebarItem(2, Icons.library_music_rounded, 'Library'),
-                    const SizedBox(height: 6),
-                    _buildSidebarItem(3, Icons.settings_rounded, 'Settings'),
-
                     const SizedBox(height: 24),
-                    const Divider(color: AppColors.glassBorder),
-                    const SizedBox(height: 12),
 
-                    // Quick Playlists Header
+                    // Borderless Navigation Items with Translucent Pill Fill ONLY on Active Tab
+                    _buildSidebarItem(0, LucideIcons.home, 'Home'),
+                    const SizedBox(height: 4),
+                    _buildSidebarItem(1, LucideIcons.search, 'Search'),
+                    const SizedBox(height: 4),
+                    _buildSidebarItem(2, LucideIcons.library, 'Library'),
+                    const SizedBox(height: 4),
+                    _buildSidebarItem(3, LucideIcons.settings, 'Settings'),
+
+                    const SizedBox(height: 28),
                     const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
                         'LOCAL PLAYLISTS',
                         style: TextStyle(
-                          color: AppColors.textSecondary,
+                          color: AppColors.textMuted,
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          letterSpacing: 1.0,
+                          letterSpacing: 0.8,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
+
                     Expanded(
                       child: ListView(
                         children: [
-                          _buildQuickPlaylistTile('OLED Night Drive'),
-                          _buildQuickPlaylistTile('Cyberpunk Workout'),
-                          _buildQuickPlaylistTile('Lossless Favorites'),
-                          _buildQuickPlaylistTile('Focus & Flowstate'),
+                          _buildPlaylistLink('Favorite Songs'),
+                          _buildPlaylistLink('Offline Downloads'),
+                          _buildPlaylistLink('FLAC Studio Mix'),
+                          _buildPlaylistLink('Recently Added'),
                         ],
                       ),
                     ),
@@ -215,15 +237,18 @@ class _AppShellState extends ConsumerState<AppShell> {
                 ),
               ),
 
-              // Main Content
+              // Main Canvas (#111114)
               Expanded(
-                child: _buildCurrentPage(),
+                child: Container(
+                  color: AppColors.canvas,
+                  child: _buildCurrentPage(),
+                ),
               ),
             ],
           ),
         ),
 
-        // Persistent Desktop Bottom Playback Dock
+        // Pro 84px Bottom Dock (#0C0C0F)
         const MiniPlayer(isDesktopDock: true),
       ],
     );
@@ -231,32 +256,39 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   Widget _buildSidebarItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
-    return FocusableCard(
-      borderRadius: BorderRadius.circular(12),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? AppColors.electricCyan : AppColors.textSecondary,
-            size: 22,
-          ),
-          const SizedBox(width: 14),
-          Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? AppColors.electricCyan : AppColors.textPrimary,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              fontSize: 14,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.pillFill : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+              size: 18,
             ),
-          ),
-        ],
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 13,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildQuickPlaylistTile(String name) {
+  Widget _buildPlaylistLink(String name) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Text(
@@ -265,7 +297,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
           color: AppColors.textSecondary,
-          fontSize: 13,
+          fontSize: 12,
         ),
       ),
     );

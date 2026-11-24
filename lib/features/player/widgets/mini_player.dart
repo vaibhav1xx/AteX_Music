@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/frosted_glass.dart';
+import '../../../data/models/track.dart';
 import '../providers/player_provider.dart';
 import 'album_art_view.dart';
 import 'now_playing_screen.dart';
 
-/// Frosted Mini-Player widget.
-/// Displayed as a floating frosted card on mobile (under 700px) or as a dock on desktop.
 class MiniPlayer extends ConsumerWidget {
   final bool isDesktopDock;
 
@@ -42,39 +41,49 @@ class MiniPlayer extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     PlayerState playerState,
-    dynamic track,
+    Track track,
     VoidCallback openNowPlaying,
   ) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: GestureDetector(
         onTap: openNowPlaying,
-        child: FrostedGlass(
+        child: Container(
           height: 64,
-          borderRadius: BorderRadius.circular(16),
           padding: const EdgeInsets.symmetric(horizontal: 10),
-          backgroundColor: const Color(0x22121724),
-          borderColor: AppColors.glassBorder,
+          decoration: BoxDecoration(
+            color: AppColors.card.withAlpha(240),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.subtleHairline, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(120),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Tiny top progress indicator
               ClipRRect(
                 borderRadius: BorderRadius.circular(2),
                 child: LinearProgressIndicator(
                   value: playerState.progressFraction,
                   minHeight: 2,
                   backgroundColor: Colors.transparent,
-                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.electricCyan),
+                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
                 ),
               ),
               Expanded(
                 child: Row(
                   children: [
                     AlbumArtView(
-                      gradientIndex: track.coverGradientIndex,
+                      imageUrl: track.localCoverPath,
+                      localFilePath: track.localCoverPath,
                       size: 42,
-                      borderRadius: 10,
+                      borderRadius: 6,
+                      placeholderText: track.title,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -89,7 +98,7 @@ class MiniPlayer extends ConsumerWidget {
                             style: const TextStyle(
                               color: AppColors.textPrimary,
                               fontWeight: FontWeight.w600,
-                              fontSize: 14,
+                              fontSize: 13,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -99,7 +108,7 @@ class MiniPlayer extends ConsumerWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: AppColors.textSecondary,
-                              fontSize: 12,
+                              fontSize: 11,
                             ),
                           ),
                         ],
@@ -107,25 +116,33 @@ class MiniPlayer extends ConsumerWidget {
                     ),
                     IconButton(
                       icon: Icon(
-                        track.isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                        color: track.isFavorite ? AppColors.electricCyan : AppColors.textSecondary,
-                        size: 20,
+                        track.isFavorite ? LucideIcons.heart : LucideIcons.heart,
+                        color: track.isFavorite ? AppColors.accent : AppColors.textMuted,
+                        size: 18,
                       ),
                       onPressed: () => ref.read(playerProvider.notifier).toggleFavorite(),
                     ),
                     IconButton(
-                      icon: Icon(
-                        playerState.isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
-                        color: AppColors.electricCyan,
-                        size: 36,
+                      icon: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.playButtonBg,
+                        ),
+                        child: Icon(
+                          playerState.isPlaying ? LucideIcons.pause : LucideIcons.play,
+                          color: AppColors.playButtonIcon,
+                          size: 16,
+                        ),
                       ),
                       onPressed: () => ref.read(playerProvider.notifier).togglePlayPause(),
                     ),
                     IconButton(
                       icon: const Icon(
-                        Icons.skip_next_rounded,
+                        LucideIcons.skipForward,
                         color: AppColors.textPrimary,
-                        size: 24,
+                        size: 18,
                       ),
                       onPressed: () => ref.read(playerProvider.notifier).next(),
                     ),
@@ -143,22 +160,25 @@ class MiniPlayer extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     PlayerState playerState,
-    dynamic track,
+    Track track,
     VoidCallback openNowPlaying,
   ) {
     final notifier = ref.read(playerProvider.notifier);
 
-    return FrostedGlass(
-      height: 90,
-      borderRadius: BorderRadius.zero,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      backgroundColor: const Color(0x330B0F19),
-      borderColor: AppColors.glassBorderSubtle,
+    return Container(
+      height: 84,
+      decoration: const BoxDecoration(
+        color: AppColors.playerDock,
+        border: Border(
+          top: BorderSide(color: AppColors.dockHairline, width: 1.0),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Row(
         children: [
-          // Left: Track Info & Favorite
-          SizedBox(
-            width: 220,
+          // Left (30%): 54x54 album art + Title + Artist + Heart toggle
+          Expanded(
+            flex: 3,
             child: Row(
               children: [
                 GestureDetector(
@@ -166,28 +186,45 @@ class MiniPlayer extends ConsumerWidget {
                   child: MouseRegion(
                     cursor: SystemMouseCursors.click,
                     child: AlbumArtView(
-                      gradientIndex: track.coverGradientIndex,
-                      size: 48,
-                      borderRadius: 10,
-                      showGlow: true,
+                      imageUrl: track.localCoverPath,
+                      localFilePath: track.localCoverPath,
+                      size: 54,
+                      borderRadius: 8,
+                      placeholderText: track.title,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        track.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              track.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: () => notifier.toggleFavorite(),
+                            child: Icon(
+                              LucideIcons.heart,
+                              size: 14,
+                              color: track.isFavorite ? AppColors.accent : AppColors.textMuted,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -202,110 +239,99 @@ class MiniPlayer extends ConsumerWidget {
                     ],
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Favorite',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  icon: Icon(
-                    track.isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                    color: track.isFavorite ? AppColors.electricCyan : AppColors.textSecondary,
-                    size: 18,
-                  ),
-                  onPressed: () => notifier.toggleFavorite(),
-                ),
               ],
             ),
           ),
 
-          // Center: Player Controls & Scrubber Bar
+          // Center (40%): Controls + Seekbar
           Expanded(
+            flex: 4,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
               children: [
-                // Controls Row
+                // Top: Controls
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
                       tooltip: 'Shuffle',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       icon: Icon(
-                        Icons.shuffle_rounded,
-                        size: 18,
-                        color: playerState.isShuffle ? AppColors.electricCyan : AppColors.textSecondary,
+                        LucideIcons.shuffle,
+                        size: 15,
+                        color: playerState.isShuffle ? AppColors.accent : AppColors.textMuted,
                       ),
                       onPressed: () => notifier.toggleShuffle(),
                     ),
-                    const SizedBox(width: 4),
                     IconButton(
                       tooltip: 'Previous',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       icon: const Icon(
-                        Icons.skip_previous_rounded,
+                        LucideIcons.skipBack,
                         color: AppColors.textPrimary,
-                        size: 22,
+                        size: 17,
                       ),
                       onPressed: () => notifier.previous(),
                     ),
-                    const SizedBox(width: 6),
-                    IconButton(
-                      tooltip: playerState.isPlaying ? 'Pause' : 'Play',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
-                      icon: Icon(
-                        playerState.isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded,
-                        color: AppColors.electricCyan,
-                        size: 36,
+                    const SizedBox(width: 4),
+                    // Crisp 38px circular Play button
+                    GestureDetector(
+                      onTap: () => notifier.togglePlayPause(),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.playButtonBg,
+                        ),
+                        child: Center(
+                          child: Icon(
+                            playerState.isPlaying ? LucideIcons.pause : LucideIcons.play,
+                            color: AppColors.playButtonIcon,
+                            size: 18,
+                          ),
+                        ),
                       ),
-                      onPressed: () => notifier.togglePlayPause(),
-                    ),
-                    const SizedBox(width: 6),
-                    IconButton(
-                      tooltip: 'Next',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      icon: const Icon(
-                        Icons.skip_next_rounded,
-                        color: AppColors.textPrimary,
-                        size: 22,
-                      ),
-                      onPressed: () => notifier.next(),
                     ),
                     const SizedBox(width: 4),
                     IconButton(
+                      tooltip: 'Next',
+                      icon: const Icon(
+                        LucideIcons.skipForward,
+                        color: AppColors.textPrimary,
+                        size: 17,
+                      ),
+                      onPressed: () => notifier.next(),
+                    ),
+                    IconButton(
                       tooltip: 'Repeat',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       icon: Icon(
                         playerState.repeatMode == PlaybackRepeatMode.one
-                            ? Icons.repeat_one_rounded
-                            : Icons.repeat_rounded,
-                        size: 18,
+                            ? LucideIcons.repeat1
+                            : LucideIcons.repeat,
+                        size: 15,
                         color: playerState.repeatMode != PlaybackRepeatMode.off
-                            ? AppColors.electricCyan
-                            : AppColors.textSecondary,
+                            ? AppColors.accent
+                            : AppColors.textMuted,
                       ),
                       onPressed: () => notifier.cycleRepeatMode(),
                     ),
                   ],
                 ),
-                // Scrubber Bar Row
+                // Bottom: Seekbar with timestamps
                 SizedBox(
-                  height: 24,
+                  height: 18,
                   child: Row(
                     children: [
                       Text(
                         _formatDuration(playerState.position),
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
                       ),
                       Expanded(
                         child: SliderTheme(
                           data: SliderTheme.of(context).copyWith(
-                            trackHeight: 2.5,
+                            trackHeight: 2.0,
+                            activeTrackColor: AppColors.accent,
+                            inactiveTrackColor: AppColors.subtleHairline,
+                            thumbColor: Colors.white,
                             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
                             overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
                           ),
@@ -313,7 +339,9 @@ class MiniPlayer extends ConsumerWidget {
                             value: playerState.position.inSeconds
                                 .toDouble()
                                 .clamp(0.0, playerState.duration.inSeconds.toDouble()),
-                            max: playerState.duration.inSeconds.toDouble(),
+                            max: playerState.duration.inSeconds > 0
+                                ? playerState.duration.inSeconds.toDouble()
+                                : 1.0,
                             onChanged: (val) {
                               notifier.seekTo(Duration(seconds: val.toInt()));
                             },
@@ -322,7 +350,7 @@ class MiniPlayer extends ConsumerWidget {
                       ),
                       Text(
                         _formatDuration(playerState.duration),
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
                       ),
                     ],
                   ),
@@ -331,35 +359,46 @@ class MiniPlayer extends ConsumerWidget {
             ),
           ),
 
-          // Right: Volume & Expand Full Screen
-          SizedBox(
-            width: 200,
+          // Right (30%): Lyrics, Queue, Equalizer, Volume, Fullscreen
+          Expanded(
+            flex: 3,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 IconButton(
                   tooltip: 'Lyrics',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                   icon: Icon(
-                    Icons.lyrics_outlined,
-                    color: playerState.isLyricsVisible ? AppColors.electricCyan : AppColors.textSecondary,
-                    size: 18,
+                    LucideIcons.mic2,
+                    size: 16,
+                    color: playerState.isLyricsVisible ? AppColors.accent : AppColors.textMuted,
                   ),
                   onPressed: () => notifier.toggleLyrics(),
                 ),
-                const Icon(
-                  Icons.volume_up_rounded,
-                  color: AppColors.textSecondary,
-                  size: 18,
+                IconButton(
+                  tooltip: 'Queue',
+                  icon: const Icon(
+                    LucideIcons.listMusic,
+                    size: 16,
+                    color: AppColors.textMuted,
+                  ),
+                  onPressed: openNowPlaying,
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  playerState.volume > 0 ? LucideIcons.volume2 : LucideIcons.volumeX,
+                  color: AppColors.textMuted,
+                  size: 16,
                 ),
                 SizedBox(
-                  width: 70,
+                  width: 76,
                   child: SliderTheme(
                     data: SliderTheme.of(context).copyWith(
                       trackHeight: 2.5,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
+                      activeTrackColor: Colors.white,
+                      inactiveTrackColor: AppColors.subtleHairline,
+                      thumbColor: Colors.white,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 3),
+                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 6),
                     ),
                     child: Slider(
                       value: playerState.volume,
@@ -368,13 +407,11 @@ class MiniPlayer extends ConsumerWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Expand Now Playing',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  tooltip: 'Full-Screen Now Playing',
                   icon: const Icon(
-                    Icons.open_in_full_rounded,
-                    color: AppColors.textSecondary,
-                    size: 18,
+                    LucideIcons.maximize2,
+                    color: AppColors.textMuted,
+                    size: 16,
                   ),
                   onPressed: openNowPlaying,
                 ),

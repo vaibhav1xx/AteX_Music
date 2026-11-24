@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../data/database/app_database.dart';
 import '../../../data/models/track.dart';
-import '../../../data/repositories/mock_music_repository.dart';
+import '../services/audio_player_handler.dart';
 
 enum PlaybackRepeatMode { off, all, one }
 
@@ -62,131 +64,206 @@ class PlayerState {
   }
 }
 
-class PlayerNotifier extends StateNotifier<PlayerState> {
-  Timer? _progressTimer;
+final audioHandlerProvider = Provider<AudioPlayerHandler>((ref) {
+  // Safe default fallback handler for standalone or testing environments
+  return AudioPlayerHandlerImpl();
+});
 
-  PlayerNotifier()
+class PlayerNotifier extends StateNotifier<PlayerState> {
+  final AudioPlayerHandler _audioHandler;
+  final AppDatabase _database;
+
+  StreamSubscription? _playbackStateSub;
+  StreamSubscription? _positionSub;
+  StreamSubscription? _durationSub;
+  StreamSubscription? _mediaItemSub;
+
+  static const idleTrack = Track(
+    id: 'idle',
+    title: 'No Track Playing',
+    artist: 'AteX Music',
+    album: 'Offline Audio Engine',
+    duration: Duration.zero,
+    genre: 'Offline',
+    filePath: '',
+    isFavorite: false,
+  );
+
+  PlayerNotifier(this._audioHandler, this._database)
       : super(
-          PlayerState(
-            currentTrack: MockMusicRepository.sampleTracks.first,
-            duration: MockMusicRepository.sampleTracks.first.duration,
-            queue: MockMusicRepository.sampleTracks,
+          const PlayerState(
+            currentTrack: idleTrack,
+            duration: Duration.zero,
+            queue: [],
             queueIndex: 0,
             isPlaying: false,
           ),
-        );
+        ) {
+    _initSubscriptions();
+  }
 
-  void togglePlayPause() {
+  void _initSubscriptions() {
+    // 1. Playback state (playing, buffering, completed)
+    _playbackStateSub = _audioHandler.playbackState.listen((playbackState) {
+      final isPlaying = playbackState.playing;
+      final qIndex = playbackState.queueIndex ?? state.queueIndex;
+
+      state = state.copyWith(
+        isPlaying: isPlaying,
+        queueIndex: qIndex,
+      );
+    });
+
+    // 2. Real-time audio playback position stream
+    _positionSub = _audioHandler.positionStream.listen((pos) {
+      state = state.copyWith(position: pos);
+    });
+
+    // 3. Track duration stream
+    _durationSub = _audioHandler.durationStream.listen((dur) {
+      if (dur != null && dur > Duration.zero) {
+        state = state.copyWith(duration: dur);
+      }
+    });
+
+    // 4. Current media item updates
+    _mediaItemSub = _audioHandler.mediaItem.listen((item) {
+      if (item != null) {
+        final matchingIndex = state.queue.indexWhere((t) => t.id == item.id);
+        if (matchingIndex >= 0) {
+          state = state.copyWith(
+            currentTrack: state.queue[matchingIndex],
+            queueIndex: matchingIndex,
+            duration: item.duration ?? state.duration,
+          );
+        } else {
+          // Construct Track from MediaItem
+          final track = Track(
+            id: item.id,
+            title: item.title,
+            artist: item.artist ?? 'Unknown Artist',
+            album: item.album ?? 'Local Audio',
+            duration: item.duration ?? Duration.zero,
+            genre: (item.extras?['genre'] as String?) ?? 'Local Audio',
+            filePath: (item.extras?['filePath'] as String?) ?? '',
+            isFavorite: (item.extras?['isFavorite'] as bool?) ?? false,
+          );
+          state = state.copyWith(
+            currentTrack: track,
+            duration: track.duration,
+          );
+        }
+      }
+    });
+  }
+
+  Future<void> togglePlayPause() async {
     if (state.isPlaying) {
-      _stopTimer();
-      state = state.copyWith(isPlaying: false);
+      await _audioHandler.pause();
     } else {
-      state = state.copyWith(isPlaying: true);
-      _startTimer();
+      await _audioHandler.play();
     }
   }
 
-  void playTrack(Track track) {
+  Future<void> playTrack(Track track) async {
     final idx = state.queue.indexWhere((t) => t.id == track.id);
-    _stopTimer();
     state = state.copyWith(
       currentTrack: track,
       duration: track.duration,
       position: Duration.zero,
-      isPlaying: true,
-      queueIndex: idx >= 0 ? idx : state.queueIndex,
+      queueIndex: idx >= 0 ? idx : 0,
     );
-    _startTimer();
+    await _audioHandler.playTrack(track);
   }
 
-  void seekTo(Duration position) {
+  Future<void> loadAndPlayQueue(List<Track> tracks, {int startIndex = 0}) async {
+    if (tracks.isEmpty) return;
+    state = state.copyWith(
+      queue: tracks,
+      queueIndex: startIndex,
+      currentTrack: tracks[startIndex],
+      duration: tracks[startIndex].duration,
+      position: Duration.zero,
+    );
+    await _audioHandler.loadQueue(tracks, initialIndex: startIndex, autoPlay: true);
+  }
+
+  Future<void> seekTo(Duration position) async {
     state = state.copyWith(position: position);
+    await _audioHandler.seek(position);
   }
 
-  void next() {
-    final nextIndex = (state.queueIndex + 1) % state.queue.length;
-    final nextTrack = state.queue[nextIndex];
-    playTrack(nextTrack);
-    state = state.copyWith(queueIndex: nextIndex);
+  Future<void> next() async {
+    await _audioHandler.skipToNext();
   }
 
-  void previous() {
-    if (state.position.inSeconds > 3) {
-      seekTo(Duration.zero);
-      return;
-    }
-    final prevIndex = (state.queueIndex - 1 + state.queue.length) % state.queue.length;
-    final prevTrack = state.queue[prevIndex];
-    playTrack(prevTrack);
-    state = state.copyWith(queueIndex: prevIndex);
+  Future<void> previous() async {
+    await _audioHandler.skipToPrevious();
   }
 
-  void toggleShuffle() {
-    state = state.copyWith(isShuffle: !state.isShuffle);
+  Future<void> toggleShuffle() async {
+    final newShuffle = !state.isShuffle;
+    state = state.copyWith(isShuffle: newShuffle);
+    await _audioHandler.setShuffleMode(
+      newShuffle ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
+    );
   }
 
-  void cycleRepeatMode() {
-    final next = switch (state.repeatMode) {
+  Future<void> cycleRepeatMode() async {
+    final nextMode = switch (state.repeatMode) {
       PlaybackRepeatMode.off => PlaybackRepeatMode.all,
       PlaybackRepeatMode.all => PlaybackRepeatMode.one,
       PlaybackRepeatMode.one => PlaybackRepeatMode.off,
     };
-    state = state.copyWith(repeatMode: next);
+    state = state.copyWith(repeatMode: nextMode);
+
+    final serviceMode = switch (nextMode) {
+      PlaybackRepeatMode.off => AudioServiceRepeatMode.none,
+      PlaybackRepeatMode.all => AudioServiceRepeatMode.all,
+      PlaybackRepeatMode.one => AudioServiceRepeatMode.one,
+    };
+    await _audioHandler.setRepeatMode(serviceMode);
   }
 
-  void toggleFavorite() {
+  Future<void> toggleFavorite() async {
     final updated = state.currentTrack.copyWith(
       isFavorite: !state.currentTrack.isFavorite,
     );
     final updatedQueue = state.queue.map((t) {
       return t.id == updated.id ? updated : t;
     }).toList();
+
     state = state.copyWith(
       currentTrack: updated,
       queue: updatedQueue,
     );
+
+    // Persist to local SQLite database
+    await _database.toggleTrackFavorite(updated.id);
   }
 
   void toggleLyrics() {
     state = state.copyWith(isLyricsVisible: !state.isLyricsVisible);
   }
 
-  void setVolume(double vol) {
-    state = state.copyWith(volume: vol.clamp(0.0, 1.0));
-  }
-
-  void _startTimer() {
-    _progressTimer?.cancel();
-    _progressTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!state.isPlaying) {
-        timer.cancel();
-        return;
-      }
-      final newSeconds = state.position.inSeconds + 1;
-      if (newSeconds >= state.duration.inSeconds) {
-        if (state.repeatMode == PlaybackRepeatMode.one) {
-          seekTo(Duration.zero);
-        } else {
-          next();
-        }
-      } else {
-        state = state.copyWith(position: Duration(seconds: newSeconds));
-      }
-    });
-  }
-
-  void _stopTimer() {
-    _progressTimer?.cancel();
-    _progressTimer = null;
+  Future<void> setVolume(double vol) async {
+    final clamped = vol.clamp(0.0, 1.0);
+    state = state.copyWith(volume: clamped);
+    await _audioHandler.setVolume(clamped);
   }
 
   @override
   void dispose() {
-    _stopTimer();
+    _playbackStateSub?.cancel();
+    _positionSub?.cancel();
+    _durationSub?.cancel();
+    _mediaItemSub?.cancel();
     super.dispose();
   }
 }
 
 final playerProvider = StateNotifierProvider<PlayerNotifier, PlayerState>((ref) {
-  return PlayerNotifier();
+  final audioHandler = ref.watch(audioHandlerProvider);
+  final db = ref.watch(appDatabaseProvider);
+  return PlayerNotifier(audioHandler, db);
 });
