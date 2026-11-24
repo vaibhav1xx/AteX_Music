@@ -5,6 +5,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/atex_monogram.dart';
 import '../../core/widgets/desktop_title_bar.dart';
+import '../../core/widgets/track_action_menu.dart';
+import '../../data/database/app_database.dart';
+import '../../data/services/update_checker_service.dart';
 import '../home/home_screen.dart';
 import '../library/library_screen.dart';
 import '../player/providers/player_provider.dart';
@@ -21,22 +24,50 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell> {
   int _currentIndex = 0;
+  bool _updateBannerDismissed = false;
+
+  bool _isTextInputActive() {
+    final focus = FocusManager.instance.primaryFocus;
+    if (focus == null) return false;
+    final ctx = focus.context;
+    if (ctx == null) return false;
+    return ctx.findAncestorWidgetOfExactType<EditableText>() != null;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final updateAsync = ref.watch(appUpdateFutureProvider);
+    final updateInfo = updateAsync.valueOrNull;
+
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.space): () {
+          if (_isTextInputActive()) return;
           ref.read(playerProvider.notifier).togglePlayPause();
         },
-        const SingleActivator(LogicalKeyboardKey.arrowRight, control: true): () {
-          ref.read(playerProvider.notifier).next();
-        },
-        const SingleActivator(LogicalKeyboardKey.arrowLeft, control: true): () {
-          ref.read(playerProvider.notifier).previous();
-        },
         const SingleActivator(LogicalKeyboardKey.keyK, control: true): () {
+          if (_isTextInputActive()) return;
           setState(() => _currentIndex = 1);
+        },
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () {
+          if (_isTextInputActive()) return;
+          ref.read(playerProvider.notifier).seekRelative(const Duration(seconds: -10));
+        },
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () {
+          if (_isTextInputActive()) return;
+          ref.read(playerProvider.notifier).seekRelative(const Duration(seconds: 10));
+        },
+        const SingleActivator(LogicalKeyboardKey.arrowUp): () {
+          if (_isTextInputActive()) return;
+          ref.read(playerProvider.notifier).adjustVolume(0.05);
+        },
+        const SingleActivator(LogicalKeyboardKey.arrowDown): () {
+          if (_isTextInputActive()) return;
+          ref.read(playerProvider.notifier).adjustVolume(-0.05);
+        },
+        const SingleActivator(LogicalKeyboardKey.keyM): () {
+          if (_isTextInputActive()) return;
+          ref.read(playerProvider.notifier).toggleMute();
         },
       },
       child: FocusScope(
@@ -54,6 +85,10 @@ class _AppShellState extends ConsumerState<AppShell> {
                       onSearchTap: () => setState(() => _currentIndex = 1),
                     ),
 
+                  // In-App Update Banner (dismissible)
+                  if (updateInfo != null && updateInfo.hasUpdate && !_updateBannerDismissed)
+                    _buildUpdateBanner(updateInfo),
+
                   // Main Responsive Layout
                   Expanded(
                     child: isDesktop
@@ -65,6 +100,54 @@ class _AppShellState extends ConsumerState<AppShell> {
             },
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildUpdateBanner(UpdateInfo updateInfo) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withAlpha(25),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.accent.withAlpha(120), width: 1.0),
+      ),
+      child: Row(
+        children: [
+          const Icon(LucideIcons.sparkles, color: AppColors.accent, size: 18),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'AteX Music v${updateInfo.latestVersion} is available!',
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.black,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              minimumSize: const Size(0, 32),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => UpdateCheckerService.launchUrlExternal(updateInfo.releaseUrl),
+            child: const Text('Download', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            icon: const Icon(LucideIcons.x, color: AppColors.textMuted, size: 16),
+            onPressed: () => setState(() => _updateBannerDismissed = true),
+          ),
+        ],
       ),
     );
   }
@@ -209,28 +292,57 @@ class _AppShellState extends ConsumerState<AppShell> {
                     _buildSidebarItem(3, LucideIcons.settings, 'Settings'),
 
                     const SizedBox(height: 28),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'LOCAL PLAYLISTS',
-                        style: TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                        ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'LOCAL PLAYLISTS',
+                              style: TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => showCreatePlaylistDialog(context, ref),
+                            behavior: HitTestBehavior.opaque,
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(
+                                LucideIcons.plus,
+                                size: 14,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 8),
 
                     Expanded(
-                      child: ListView(
-                        children: [
-                          _buildPlaylistLink('Favorite Songs'),
-                          _buildPlaylistLink('Offline Downloads'),
-                          _buildPlaylistLink('FLAC Studio Mix'),
-                          _buildPlaylistLink('Recently Added'),
-                        ],
+                      child: Consumer(
+                        builder: (context, ref, _) {
+                          final playlistsAsync = ref.watch(playlistsStreamProvider);
+                          final playlists = playlistsAsync.valueOrNull ?? [];
+
+                          return ListView(
+                            children: [
+                              _buildPlaylistLink('Favorite Songs', onTap: () => setState(() => _currentIndex = 2)),
+                              _buildPlaylistLink('Offline Downloads', onTap: () => setState(() => _currentIndex = 2)),
+                              ...playlists.map(
+                                (pl) => _buildPlaylistLink(
+                                  pl.name,
+                                  onTap: () => setState(() => _currentIndex = 2),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -288,16 +400,20 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
-  Widget _buildPlaylistLink(String name) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Text(
-        name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: AppColors.textSecondary,
-          fontSize: 12,
+  Widget _buildPlaylistLink(String name, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Text(
+          name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 12,
+          ),
         ),
       ),
     );

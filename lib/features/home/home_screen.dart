@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/shimmer_skeleton.dart';
+import '../../core/widgets/track_action_menu.dart';
 import '../../data/database/app_database.dart';
 import '../../data/models/track.dart';
 import '../../data/scanner/music_scanner.dart';
@@ -334,7 +336,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: SizedBox(
                   height: 228,
                   child: trendingSongs.isEmpty
-                      ? const Center(child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2))
+                      ? Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isDesktop ? 36 : 20,
+                          ),
+                          child: const ShimmerHorizontalCharts(),
+                        )
                       : ListView.separated(
                           scrollDirection: Axis.horizontal,
                           padding: EdgeInsets.symmetric(
@@ -472,21 +479,35 @@ class _QuickPickTileState extends State<_QuickPickTile> {
                 ),
               ),
               if (_hovered)
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.playButtonBg,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Consumer(
+                      builder: (ctx, ref, _) => IconButton(
+                        icon: const Icon(LucideIcons.ellipsisVertical, size: 16, color: AppColors.textMuted),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => showTrackActionMenu(context, ref, widget.track),
+                      ),
                     ),
-                    child: const Icon(
-                      LucideIcons.play,
-                      color: AppColors.playButtonIcon,
-                      size: 16,
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.playButtonBg,
+                        ),
+                        child: const Icon(
+                          LucideIcons.play,
+                          color: AppColors.playButtonIcon,
+                          size: 16,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 )
               else
                 const SizedBox(width: 12),
@@ -564,15 +585,27 @@ class _SongCardState extends State<_SongCard> {
                 ],
               ),
               const SizedBox(height: 8),
-              Text(
-                widget.track.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.track.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  Consumer(
+                    builder: (ctx, ref, _) => GestureDetector(
+                      onTap: () => showTrackActionMenu(context, ref, widget.track),
+                      child: const Icon(LucideIcons.ellipsisVertical, size: 14, color: AppColors.textMuted),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 2),
               Text(

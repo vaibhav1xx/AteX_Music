@@ -242,6 +242,72 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
     await _database.toggleTrackFavorite(updated.id);
   }
 
+  Future<void> toggleTrackFavorite(Track track) async {
+    final updated = track.copyWith(
+      isFavorite: !track.isFavorite,
+    );
+    final updatedQueue = state.queue.map((t) {
+      return t.id == updated.id ? updated : t;
+    }).toList();
+    final updatedCurrent =
+        state.currentTrack.id == updated.id ? updated : state.currentTrack;
+
+    state = state.copyWith(
+      currentTrack: updatedCurrent,
+      queue: updatedQueue,
+    );
+
+    await _database.toggleTrackFavorite(updated.id);
+  }
+
+  Future<void> playNext(Track track) async {
+    if (state.queue.isEmpty) {
+      await loadAndPlayQueue([track]);
+      return;
+    }
+    final nextIndex = (state.queueIndex + 1).clamp(0, state.queue.length);
+    final updatedQueue = List<Track>.from(state.queue)..insert(nextIndex, track);
+    state = state.copyWith(queue: updatedQueue);
+    await _audioHandler.insertTrack(nextIndex, track);
+  }
+
+  Future<void> addToQueue(Track track) async {
+    if (state.queue.isEmpty) {
+      await loadAndPlayQueue([track]);
+      return;
+    }
+    final updatedQueue = List<Track>.from(state.queue)..add(track);
+    state = state.copyWith(queue: updatedQueue);
+    await _audioHandler.addTrack(track);
+  }
+
+  Future<void> seekRelative(Duration delta) async {
+    final target = state.position + delta;
+    final clamped = target < Duration.zero
+        ? Duration.zero
+        : (target > state.duration ? state.duration : target);
+    await seekTo(clamped);
+  }
+
+  double _lastNonZeroVolume = 1.0;
+
+  Future<void> adjustVolume(double delta) async {
+    final target = (state.volume + delta).clamp(0.0, 1.0);
+    if (target > 0) {
+      _lastNonZeroVolume = target;
+    }
+    await setVolume(target);
+  }
+
+  Future<void> toggleMute() async {
+    if (state.volume > 0.0) {
+      _lastNonZeroVolume = state.volume;
+      await setVolume(0.0);
+    } else {
+      await setVolume(_lastNonZeroVolume > 0.0 ? _lastNonZeroVolume : 0.5);
+    }
+  }
+
   void toggleLyrics() {
     state = state.copyWith(isLyricsVisible: !state.isLyricsVisible);
   }

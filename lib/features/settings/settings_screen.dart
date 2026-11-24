@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/atex_monogram.dart';
+import '../../data/services/update_checker_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -16,6 +20,132 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _highContrastTv = true;
   bool _carAutoPlay = true;
   bool _bluetoothMediaKeys = true;
+  bool _isCheckingUpdate = false;
+  String _currentVersion = '1.0.0';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPackageInfo();
+  }
+
+  Future<void> _loadPackageInfo() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _currentVersion = '${info.version}+${info.buildNumber}';
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _checkForUpdates() async {
+    setState(() => _isCheckingUpdate = true);
+    final service = UpdateCheckerService();
+
+    try {
+      final info = await service.checkForUpdate();
+      if (!mounted) return;
+
+      if (info.hasUpdate) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: AppColors.sidebar,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: AppColors.subtleHairline),
+            ),
+            title: Row(
+              children: const [
+                Icon(LucideIcons.sparkles, color: AppColors.accent, size: 20),
+                SizedBox(width: 10),
+                Text(
+                  'Update Available',
+                  style: TextStyle(color: AppColors.textPrimary, fontSize: 17, fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'A newer version of AteX Music is available: v${info.latestVersion}',
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Current version: v$_currentVersion',
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+                if (info.releaseNotes.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Release Notes:',
+                    style: TextStyle(color: AppColors.accent, fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    constraints: const BoxConstraints(maxHeight: 140),
+                    child: SingleChildScrollView(
+                      child: Text(
+                        info.releaseNotes,
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Later', style: TextStyle(color: AppColors.textSecondary)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  UpdateCheckerService.launchUrlExternal(info.releaseUrl);
+                },
+                child: const Text('Download Update', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        );
+      } else {
+        AppToast.show(
+          context,
+          'AteX Music is up to date (v$_currentVersion)',
+          icon: LucideIcons.checkCheck,
+          iconColor: Colors.greenAccent,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        AppToast.show(
+          context,
+          'Unable to reach GitHub updates service',
+          icon: LucideIcons.alertCircle,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingUpdate = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -168,6 +298,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       subtitle: const Text('Accessible glowing outlines optimized for remote D-Pad traversal.', style: TextStyle(fontSize: 12)),
                       value: _highContrastTv,
                       onChanged: (val) => setState(() => _highContrastTv = val),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+
+              // In-App Updates Section
+              _buildSectionHeader('UPDATES & MAINTENANCE'),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(LucideIcons.refreshCw, color: AppColors.accent, size: 20),
+                      title: const Text(
+                        'Check for Updates',
+                        style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                      subtitle: Text(
+                        'Current version: v$_currentVersion • GitHub Releases',
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      ),
+                      trailing: _isCheckingUpdate
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
+                            )
+                          : ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.cardHover,
+                                foregroundColor: AppColors.textPrimary,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              ),
+                              onPressed: _isCheckingUpdate ? null : _checkForUpdates,
+                              child: const Text('Check Now', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            ),
+                      onTap: _isCheckingUpdate ? null : _checkForUpdates,
                     ),
                   ],
                 ),

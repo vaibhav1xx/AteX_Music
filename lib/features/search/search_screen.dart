@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/shimmer_skeleton.dart';
+import '../../core/widgets/track_action_menu.dart';
 import '../../data/database/app_database.dart';
 import '../../data/models/track.dart';
 import '../../data/services/itunes_search_service.dart';
@@ -62,11 +65,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
       builder: (ctx) => _PlaylistImporterModal(
         onImportTracks: (tracks) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Imported ${tracks.length} tracks to offline download queue'),
-              backgroundColor: AppColors.surfaceElevated,
-            ),
+          AppToast.show(
+            context,
+            'Imported ${tracks.length} tracks to offline download queue',
+            icon: LucideIcons.download,
           );
         },
       ),
@@ -180,9 +182,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               Expanded(
                 child: _query.isEmpty
                     ? _buildEmptyPrompt()
-                    : !hasResults && !_isLoading
-                        ? _buildNoResults()
-                        : ListView(
+                    : (_isLoading && !hasResults)
+                        ? ListView(
+                            children: List.generate(8, (_) => const ShimmerTrackRow()),
+                          )
+                        : !hasResults && !_isLoading
+                            ? _buildNoResults()
+                            : ListView(
                             children: [
                               // 1. Top Result Hero Card
                               if (topResult != null) ...[
@@ -431,6 +437,13 @@ class _TopResultCardState extends State<_TopResultCard> {
                 icon: const Icon(LucideIcons.download, color: AppColors.textSecondary, size: 20),
                 onPressed: widget.onDownload,
               ),
+              Consumer(
+                builder: (ctx, ref, _) => IconButton(
+                  tooltip: 'More actions',
+                  icon: const Icon(LucideIcons.ellipsisVertical, color: AppColors.textSecondary, size: 20),
+                  onPressed: () => showTrackActionMenu(context, ref, widget.track),
+                ),
+              ),
               const SizedBox(width: 8),
               Container(
                 width: 44,
@@ -560,6 +573,15 @@ class _TrackListTileState extends State<_TrackListTile> {
                   icon: const Icon(LucideIcons.download, size: 16, color: AppColors.textMuted),
                   onPressed: widget.onDownload,
                 ),
+              Consumer(
+                builder: (ctx, ref, _) => IconButton(
+                  tooltip: 'More actions',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  icon: const Icon(LucideIcons.ellipsisVertical, size: 16, color: AppColors.textMuted),
+                  onPressed: () => showTrackActionMenu(context, ref, widget.track),
+                ),
+              ),
             ],
           ),
         ),

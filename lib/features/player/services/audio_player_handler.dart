@@ -10,6 +10,8 @@ import '../../../data/models/track.dart';
 abstract class AudioPlayerHandler extends BaseAudioHandler {
   Future<void> loadQueue(List<Track> tracks, {int initialIndex = 0, bool autoPlay = true});
   Future<void> playTrack(Track track);
+  Future<void> insertTrack(int index, Track track);
+  Future<void> addTrack(Track track);
   Future<void> setVolume(double volume);
   Stream<Duration> get positionStream;
   Stream<Duration?> get durationStream;
@@ -106,6 +108,21 @@ class AudioPlayerHandlerImpl extends AudioPlayerHandler {
       final newTracks = [track, ..._tracks];
       await loadQueue(newTracks, initialIndex: 0, autoPlay: true);
     }
+  }
+
+  @override
+  Future<void> insertTrack(int index, Track track) async {
+    final clamped = index.clamp(0, _tracks.length);
+    _tracks.insert(clamped, track);
+    await _playlist.insert(clamped, _createAudioSource(track));
+    queue.add(_tracks.map(_trackToMediaItem).toList());
+  }
+
+  @override
+  Future<void> addTrack(Track track) async {
+    _tracks.add(track);
+    await _playlist.add(_createAudioSource(track));
+    queue.add(_tracks.map(_trackToMediaItem).toList());
   }
 
   AudioSource _createAudioSource(Track track) {

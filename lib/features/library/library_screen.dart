@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_toast.dart';
+import '../../core/widgets/track_action_menu.dart';
 import '../../data/database/app_database.dart';
 import '../../data/models/track.dart';
 import '../../data/scanner/music_scanner.dart';
@@ -337,13 +339,137 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
   }
 
   Widget _buildPlaylistsTab() {
+    final playlistsAsync = ref.watch(playlistsStreamProvider);
+    final playlists = playlistsAsync.valueOrNull ?? [];
+
     return ListView(
       children: [
+        // Create New Playlist Card
+        GestureDetector(
+          onTap: () => showCreatePlaylistDialog(context, ref),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.cardHover,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.subtleHairline),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withAlpha(30),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(LucideIcons.plus, color: AppColors.accent, size: 22),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'New Playlist',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Create an offline playlist saved in local SQLite storage',
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Default System Playlists
         _buildPlaylistTile('Favorite Tracks', 'All your liked tracks', LucideIcons.heart),
         const SizedBox(height: 8),
         _buildPlaylistTile('Recently Added', 'Latest imported local audio', LucideIcons.clock),
         const SizedBox(height: 8),
         _buildPlaylistTile('High Resolution Lossless', 'FLAC and 24-bit audio tracks', LucideIcons.disc),
+        const SizedBox(height: 8),
+
+        // User Playlists from Drift Database
+        if (playlists.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Text(
+              'YOUR PLAYLISTS',
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+          ...playlists.map(
+            (pl) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.cardHover,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(LucideIcons.listMusic, color: AppColors.accent, size: 20),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            pl.name,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            pl.description ?? 'Local Playlist',
+                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(LucideIcons.trash2, size: 16, color: AppColors.textMuted),
+                      onPressed: () async {
+                        final db = ref.read(appDatabaseProvider);
+                        await db.deletePlaylist(pl.id);
+                        if (!mounted) return;
+                        AppToast.show(context, 'Deleted "${pl.name}"', icon: LucideIcons.trash);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -559,6 +685,17 @@ class _LibraryTrackTileState extends State<_LibraryTrackTile> {
                   widget.track.isFavorite ? LucideIcons.heart : LucideIcons.heart,
                   color: widget.track.isFavorite ? AppColors.accent : AppColors.textMuted,
                   size: 18,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Consumer(
+                builder: (ctx, ref, _) => GestureDetector(
+                  onTap: () => showTrackActionMenu(context, ref, widget.track),
+                  child: const Icon(
+                    LucideIcons.ellipsisVertical,
+                    color: AppColors.textMuted,
+                    size: 18,
+                  ),
                 ),
               ),
             ],
