@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+
 import '../../../data/models/track.dart';
 
 /// Smooth, lightweight CustomPainter reactive frequency-bar & glowing circular wave visualizer
@@ -88,19 +90,24 @@ class _AudioVisualizerViewState extends State<AudioVisualizerView>
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: widget.accentColor.withAlpha(widget.isPlaying ? 160 : 70),
+                    color: widget.accentColor.withAlpha(
+                      widget.isPlaying ? 160 : 70,
+                    ),
                     width: 2.0,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: widget.accentColor.withAlpha(widget.isPlaying ? 90 : 30),
+                      color: widget.accentColor.withAlpha(
+                        widget.isPlaying ? 90 : 30,
+                      ),
                       blurRadius: widget.isPlaying ? 28 : 12,
                       spreadRadius: widget.isPlaying ? 3 : 0,
                     ),
                   ],
                 ),
                 child: ClipOval(
-                  child: widget.track.localCoverPath != null &&
+                  child:
+                      widget.track.localCoverPath != null &&
                           File(widget.track.localCoverPath!).existsSync()
                       ? Image.file(
                           File(widget.track.localCoverPath!),
@@ -216,31 +223,39 @@ class _FrequencyBarsVisualizerPainter extends CustomPainter {
       final x = (i * barSpacing) + (barSpacing / 2);
 
       // Multi-frequency synthesis: bass (low indices) + mids + treble
-      double harmonic1 = math.sin((animValue * 2 * math.pi * 2.0) + (i * 0.35) + (trackSeed % 7));
-      double harmonic2 = math.cos((animValue * 2 * math.pi * 3.5) - (i * 0.25) + positionSeconds);
+      double harmonic1 = math.sin(
+        (animValue * 2 * math.pi * 2.0) + (i * 0.35) + (trackSeed % 7),
+      );
+      double harmonic2 = math.cos(
+        (animValue * 2 * math.pi * 3.5) - (i * 0.25) + positionSeconds,
+      );
       double harmonic3 = math.sin((animValue * 2 * math.pi * 1.2) + (i * 0.55));
 
       // Shape spectrum envelope (higher in mid/bass, tapering at ends)
       final envelope = math.sin((i / (barCount - 1)) * math.pi);
-      double amplitude = (harmonic1 * 0.5 + harmonic2 * 0.3 + harmonic3 * 0.2).abs();
+      double amplitude = (harmonic1 * 0.5 + harmonic2 * 0.3 + harmonic3 * 0.2)
+          .abs();
 
       if (!isPlaying) {
         amplitude = 0.08 + (math.sin(i * 0.5) * 0.04).abs();
       }
 
-      final barHeight = math.max(3.0, (amplitude * envelope * maxHeight).clamp(3.0, maxHeight));
+      final barHeight = math.max(
+        3.0,
+        (amplitude * envelope * maxHeight).clamp(3.0, maxHeight),
+      );
       final topY = size.height - barHeight;
 
       final rect = Rect.fromLTWH(x - (barWidth / 2), topY, barWidth, barHeight);
-      final rrect = RRect.fromRectAndRadius(rect, Radius.circular(barWidth / 2));
+      final rrect = RRect.fromRectAndRadius(
+        rect,
+        Radius.circular(barWidth / 2),
+      );
 
       // Gradient from glowing accent at top to subtle base
       final barPaint = Paint()
         ..shader = LinearGradient(
-          colors: [
-            accentColor,
-            accentColor.withAlpha(isPlaying ? 80 : 30),
-          ],
+          colors: [accentColor, accentColor.withAlpha(isPlaying ? 80 : 30)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ).createShader(rect)
@@ -274,4 +289,3 @@ class _FrequencyBarsVisualizerPainter extends CustomPainter {
         oldDelegate.positionSeconds != positionSeconds;
   }
 }
-

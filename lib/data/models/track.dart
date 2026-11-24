@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+
 import '../database/app_database.dart';
 
 class Track {
@@ -112,9 +113,15 @@ class Track {
   }
 
   String get durationFormatted {
-    final minutes = duration.inMinutes;
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    final secStr = seconds.toString().padLeft(2, '0');
+    if (hours > 0) {
+      final minStr = minutes.toString().padLeft(2, '0');
+      return '$hours:$minStr:$secStr';
+    }
+    return '$minutes:$secStr';
   }
 }
 

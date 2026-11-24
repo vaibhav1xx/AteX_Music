@@ -88,7 +88,7 @@ void main() {
       expect(track.playCount, 15);
       expect(track.lastPlayed, now);
       expect(track.lastPlayedAt, now);
-      expect(track.durationFormatted, '03:45');
+      expect(track.durationFormatted, '3:45');
 
       final companion = track.toCompanion();
       expect(companion.id.value, 'track_test_1');

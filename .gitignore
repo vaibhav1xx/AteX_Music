@@ -46,3 +46,12 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Keystores & release signing secrets
+key.properties
+android/key.properties
+*.jks
+*.keystore
+
+# Inno Setup output
+windows/installer/Output/

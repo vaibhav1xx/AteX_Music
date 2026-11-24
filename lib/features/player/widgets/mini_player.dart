@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/track.dart';
 import '../providers/player_provider.dart';
@@ -12,10 +13,7 @@ import 'track_info_sheet.dart';
 class MiniPlayer extends ConsumerWidget {
   final bool isDesktopDock;
 
-  const MiniPlayer({
-    super.key,
-    this.isDesktopDock = false,
-  });
+  const MiniPlayer({super.key, this.isDesktopDock = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -33,10 +31,22 @@ class MiniPlayer extends ConsumerWidget {
     }
 
     if (isDesktopDock) {
-      return _buildDesktopDock(context, ref, playerState, track, openNowPlaying);
+      return _buildDesktopDock(
+        context,
+        ref,
+        playerState,
+        track,
+        openNowPlaying,
+      );
     }
 
-    return _buildMobileFloatingCard(context, ref, playerState, track, openNowPlaying);
+    return _buildMobileFloatingCard(
+      context,
+      ref,
+      playerState,
+      track,
+      openNowPlaying,
+    );
   }
 
   Widget _buildMobileFloatingCard(
@@ -74,7 +84,9 @@ class MiniPlayer extends ConsumerWidget {
                   value: playerState.progressFraction,
                   minHeight: 2,
                   backgroundColor: Colors.transparent,
-                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.accent,
+                  ),
                 ),
               ),
               Expanded(
@@ -118,16 +130,25 @@ class MiniPlayer extends ConsumerWidget {
                     ),
                     IconButton(
                       tooltip: 'Pro Controls',
-                      icon: const Icon(LucideIcons.slidersHorizontal, size: 16, color: AppColors.textMuted),
+                      icon: const Icon(
+                        LucideIcons.slidersHorizontal,
+                        size: 16,
+                        color: AppColors.textMuted,
+                      ),
                       onPressed: () => showPlaybackEffectsSheet(context, ref),
                     ),
                     IconButton(
                       icon: Icon(
-                        track.isFavorite ? LucideIcons.heart : LucideIcons.heart,
-                        color: track.isFavorite ? AppColors.accent : AppColors.textMuted,
+                        track.isFavorite
+                            ? LucideIcons.heart
+                            : LucideIcons.heart,
+                        color: track.isFavorite
+                            ? AppColors.accent
+                            : AppColors.textMuted,
                         size: 18,
                       ),
-                      onPressed: () => ref.read(playerProvider.notifier).toggleFavorite(),
+                      onPressed: () =>
+                          ref.read(playerProvider.notifier).toggleFavorite(),
                     ),
                     IconButton(
                       icon: Container(
@@ -137,13 +158,24 @@ class MiniPlayer extends ConsumerWidget {
                           shape: BoxShape.circle,
                           color: AppColors.playButtonBg,
                         ),
-                        child: Icon(
-                          playerState.isPlaying ? LucideIcons.pause : LucideIcons.play,
-                          color: AppColors.playButtonIcon,
-                          size: 16,
-                        ),
+                        child: playerState.isResolving
+                            ? const Padding(
+                                padding: EdgeInsets.all(7),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.playButtonIcon,
+                                ),
+                              )
+                            : Icon(
+                                playerState.isPlaying
+                                    ? LucideIcons.pause
+                                    : LucideIcons.play,
+                                color: AppColors.playButtonIcon,
+                                size: 16,
+                              ),
                       ),
-                      onPressed: () => ref.read(playerProvider.notifier).togglePlayPause(),
+                      onPressed: () =>
+                          ref.read(playerProvider.notifier).togglePlayPause(),
                     ),
                     IconButton(
                       icon: const Icon(
@@ -228,7 +260,9 @@ class MiniPlayer extends ConsumerWidget {
                             child: Icon(
                               LucideIcons.heart,
                               size: 14,
-                              color: track.isFavorite ? AppColors.accent : AppColors.textMuted,
+                              color: track.isFavorite
+                                  ? AppColors.accent
+                                  : AppColors.textMuted,
                             ),
                           ),
                         ],
@@ -265,7 +299,9 @@ class MiniPlayer extends ConsumerWidget {
                       icon: Icon(
                         LucideIcons.shuffle,
                         size: 15,
-                        color: playerState.isShuffle ? AppColors.accent : AppColors.textMuted,
+                        color: playerState.isShuffle
+                            ? AppColors.accent
+                            : AppColors.textMuted,
                       ),
                       onPressed: () => notifier.toggleShuffle(),
                     ),
@@ -290,11 +326,22 @@ class MiniPlayer extends ConsumerWidget {
                           color: AppColors.playButtonBg,
                         ),
                         child: Center(
-                          child: Icon(
-                            playerState.isPlaying ? LucideIcons.pause : LucideIcons.play,
-                            color: AppColors.playButtonIcon,
-                            size: 18,
-                          ),
+                          child: playerState.isResolving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.playButtonIcon,
+                                  ),
+                                )
+                              : Icon(
+                                  playerState.isPlaying
+                                      ? LucideIcons.pause
+                                      : LucideIcons.play,
+                                  color: AppColors.playButtonIcon,
+                                  size: 18,
+                                ),
                         ),
                       ),
                     ),
@@ -330,7 +377,10 @@ class MiniPlayer extends ConsumerWidget {
                     children: [
                       Text(
                         _formatDuration(playerState.position),
-                        style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                        style: const TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 10,
+                        ),
                       ),
                       Expanded(
                         child: SliderTheme(
@@ -339,13 +389,20 @@ class MiniPlayer extends ConsumerWidget {
                             activeTrackColor: AppColors.accent,
                             inactiveTrackColor: AppColors.subtleHairline,
                             thumbColor: Colors.white,
-                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
-                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 4,
+                            ),
+                            overlayShape: const RoundSliderOverlayShape(
+                              overlayRadius: 8,
+                            ),
                           ),
                           child: Slider(
                             value: playerState.position.inSeconds
                                 .toDouble()
-                                .clamp(0.0, playerState.duration.inSeconds.toDouble()),
+                                .clamp(
+                                  0.0,
+                                  playerState.duration.inSeconds.toDouble(),
+                                ),
                             max: playerState.duration.inSeconds > 0
                                 ? playerState.duration.inSeconds.toDouble()
                                 : 1.0,
@@ -357,7 +414,10 @@ class MiniPlayer extends ConsumerWidget {
                       ),
                       Text(
                         _formatDuration(playerState.duration),
-                        style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                        style: const TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 10,
+                        ),
                       ),
                     ],
                   ),
@@ -377,7 +437,11 @@ class MiniPlayer extends ConsumerWidget {
                   icon: Icon(
                     LucideIcons.slidersHorizontal,
                     size: 16,
-                    color: (playerState.speed != 1.0 || playerState.pitch != 1.0 || playerState.skipSilence || playerState.sleepTimerMinutesRemaining != null)
+                    color:
+                        (playerState.speed != 1.0 ||
+                            playerState.pitch != 1.0 ||
+                            playerState.skipSilence ||
+                            playerState.sleepTimerMinutesRemaining != null)
                         ? AppColors.accent
                         : AppColors.textMuted,
                   ),
@@ -397,7 +461,9 @@ class MiniPlayer extends ConsumerWidget {
                   icon: Icon(
                     LucideIcons.mic2,
                     size: 16,
-                    color: playerState.isLyricsVisible ? AppColors.accent : AppColors.textMuted,
+                    color: playerState.isLyricsVisible
+                        ? AppColors.accent
+                        : AppColors.textMuted,
                   ),
                   onPressed: () => notifier.toggleLyrics(),
                 ),
@@ -412,7 +478,9 @@ class MiniPlayer extends ConsumerWidget {
                 ),
                 const SizedBox(width: 4),
                 Icon(
-                  playerState.volume > 0 ? LucideIcons.volume2 : LucideIcons.volumeX,
+                  playerState.volume > 0
+                      ? LucideIcons.volume2
+                      : LucideIcons.volumeX,
                   color: AppColors.textMuted,
                   size: 16,
                 ),
@@ -424,8 +492,12 @@ class MiniPlayer extends ConsumerWidget {
                       activeTrackColor: Colors.white,
                       inactiveTrackColor: AppColors.subtleHairline,
                       thumbColor: Colors.white,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 3),
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 6),
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 3,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 6,
+                      ),
                     ),
                     child: Slider(
                       value: playerState.volume,

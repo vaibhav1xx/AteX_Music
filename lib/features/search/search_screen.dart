@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/shimmer_skeleton.dart';
@@ -13,6 +14,7 @@ import '../../data/services/itunes_search_service.dart';
 import '../../data/services/offline_download_service.dart';
 import '../../data/services/podcast_service.dart';
 import '../../data/services/radio_service.dart';
+import '../../data/services/universal_playlist_importer.dart';
 import '../player/providers/player_provider.dart';
 import '../player/widgets/album_art_view.dart';
 import '../podcast/widgets/podcast_episodes_sheet.dart';
@@ -58,7 +60,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     try {
       if (_selectedCategory == SearchCategory.music) {
-        final results = await ref.read(iTunesSearchServiceProvider).search(query);
+        final results = await ref
+            .read(iTunesSearchServiceProvider)
+            .search(query);
         if (mounted && _query == query) {
           setState(() {
             _itunesResults = results;
@@ -66,7 +70,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           });
         }
       } else if (_selectedCategory == SearchCategory.radio) {
-        final stations = await ref.read(radioServiceProvider).searchStations(query);
+        final stations = await ref
+            .read(radioServiceProvider)
+            .searchStations(query);
         if (mounted && _query == query) {
           setState(() {
             _radioResults = stations;
@@ -74,7 +80,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           });
         }
       } else {
-        final pods = await ref.read(podcastServiceProvider).searchPodcasts(query);
+        final pods = await ref
+            .read(podcastServiceProvider)
+            .searchPodcasts(query);
         if (mounted && _query == query) {
           setState(() {
             _podcastResults = pods;
@@ -105,11 +113,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => _PlaylistImporterModal(
-        onImportTracks: (tracks) {
+        onImportResult: (result) {
+          if (!mounted) return;
           AppToast.show(
             context,
-            'Imported ${tracks.length} tracks to offline download queue',
-            icon: LucideIcons.download,
+            result.message,
+            icon: result.success
+                ? LucideIcons.listMusic
+                : LucideIcons.alertCircle,
           );
         },
       ),
@@ -125,9 +136,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     // Local SQLite database tracks
     final dbTracksAsync = ref.watch(allTracksStreamProvider);
-    final dbTracks = dbTracksAsync.valueOrNull?.map((d) => d.toDomain()).toList() ?? [];
+    final dbTracks =
+        dbTracksAsync.valueOrNull?.map((d) => d.toDomain()).toList() ?? [];
 
-    final localMatches = _query.isEmpty || _selectedCategory != SearchCategory.music
+    final localMatches =
+        _query.isEmpty || _selectedCategory != SearchCategory.music
         ? <Track>[]
         : dbTracks.where((t) {
             final q = _query.toLowerCase();
@@ -136,7 +149,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 t.album.toLowerCase().contains(q);
           }).toList();
 
-    final hasResults = localMatches.isNotEmpty ||
+    final hasResults =
+        localMatches.isNotEmpty ||
         _itunesResults.isNotEmpty ||
         _radioResults.isNotEmpty ||
         _podcastResults.isNotEmpty;
@@ -169,19 +183,30 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(LucideIcons.search, color: AppColors.textMuted, size: 18),
+                          const Icon(
+                            LucideIcons.search,
+                            color: AppColors.textMuted,
+                            size: 18,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: TextField(
                               controller: _searchController,
-                              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 14,
+                              ),
                               decoration: InputDecoration(
-                                hintText: _selectedCategory == SearchCategory.music
+                                hintText:
+                                    _selectedCategory == SearchCategory.music
                                     ? 'Search songs, artists, albums, or offline audio...'
                                     : (_selectedCategory == SearchCategory.radio
-                                        ? 'Search live radio stations by name or tag...'
-                                        : 'Search podcasts and audio shows...'),
-                                hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                                          ? 'Search live radio stations by name or tag...'
+                                          : 'Search podcasts and audio shows...'),
+                                hintStyle: const TextStyle(
+                                  color: AppColors.textMuted,
+                                  fontSize: 13,
+                                ),
                                 border: InputBorder.none,
                                 isDense: true,
                               ),
@@ -192,7 +217,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.accent,
+                              ),
                             )
                           else if (_query.isNotEmpty)
                             GestureDetector(
@@ -200,7 +228,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                 _searchController.clear();
                                 _performSearch('');
                               },
-                              child: const Icon(LucideIcons.x, color: AppColors.textMuted, size: 16),
+                              child: const Icon(
+                                LucideIcons.x,
+                                color: AppColors.textMuted,
+                                size: 16,
+                              ),
                             ),
                         ],
                       ),
@@ -213,14 +245,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       backgroundColor: AppColors.cardHover,
                       foregroundColor: AppColors.textPrimary,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                     onPressed: _openPlaylistImporterModal,
-                    icon: const Icon(LucideIcons.link, size: 16, color: AppColors.accent),
+                    icon: const Icon(
+                      LucideIcons.link,
+                      size: 16,
+                      color: AppColors.accent,
+                    ),
                     label: const Text(
                       'Import Playlist URL',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -230,11 +274,23 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               // Search Filter Pills (Music / Radio / Podcasts)
               Row(
                 children: [
-                  _buildCategoryPill(SearchCategory.music, LucideIcons.music, 'Music'),
+                  _buildCategoryPill(
+                    SearchCategory.music,
+                    LucideIcons.music,
+                    'Music',
+                  ),
                   const SizedBox(width: 8),
-                  _buildCategoryPill(SearchCategory.radio, LucideIcons.radio, 'Live Radio'),
+                  _buildCategoryPill(
+                    SearchCategory.radio,
+                    LucideIcons.radio,
+                    'Live Radio',
+                  ),
                   const SizedBox(width: 8),
-                  _buildCategoryPill(SearchCategory.podcasts, LucideIcons.podcast, 'Podcasts'),
+                  _buildCategoryPill(
+                    SearchCategory.podcasts,
+                    LucideIcons.podcast,
+                    'Podcasts',
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -244,267 +300,299 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 child: _query.isEmpty
                     ? _buildEmptyPrompt()
                     : (_isLoading && !hasResults)
-                        ? ListView(
-                            children: List.generate(8, (_) => const ShimmerTrackRow()),
-                          )
-                        : !hasResults && !_isLoading
-                            ? _buildNoResults()
-                            : ListView(
+                    ? ListView(
+                        children: List.generate(
+                          8,
+                          (_) => const ShimmerTrackRow(),
+                        ),
+                      )
+                    : !hasResults && !_isLoading
+                    ? _buildNoResults()
+                    : ListView(
+                        children: [
+                          // --- MUSIC RESULTS ---
+                          if (_selectedCategory == SearchCategory.music) ...[
+                            // Top Result Hero Card
+                            if (topResult != null) ...[
+                              const Text(
+                                'Top Result',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              _TopResultCard(
+                                track: topResult,
+                                onPlay: () =>
+                                    playerNotifier.playTrack(topResult),
+                                onDownload: () => downloadService
+                                    .downloadTrackDomain(topResult),
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+
+                            // Local Database Matches
+                            if (localMatches.isNotEmpty) ...[
+                              Row(
                                 children: [
-                                  // --- MUSIC RESULTS ---
-                                  if (_selectedCategory == SearchCategory.music) ...[
-                                    // Top Result Hero Card
-                                    if (topResult != null) ...[
-                                      const Text(
-                                        'Top Result',
-                                        style: TextStyle(
-                                          color: AppColors.textPrimary,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: -0.3,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 10),
-                                      _TopResultCard(
-                                        track: topResult,
-                                        onPlay: () => playerNotifier.playTrack(topResult),
-                                        onDownload: () {
-                                          downloadService.downloadTrack(
-                                            trackId: topResult.id,
-                                            audioUrl: topResult.filePath,
-                                            title: topResult.title,
-                                            artist: topResult.artist,
-                                            album: topResult.album,
-                                            coverUrl: topResult.localCoverPath,
-                                            duration: topResult.duration,
-                                          );
-                                        },
-                                      ),
-                                      const SizedBox(height: 24),
-                                    ],
-
-                                    // Local Database Matches
-                                    if (localMatches.isNotEmpty) ...[
-                                      Row(
-                                        children: [
-                                          const Icon(LucideIcons.hardDrive, size: 14, color: AppColors.accent),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'Offline Library Matches (${localMatches.length})',
-                                            style: const TextStyle(
-                                              color: AppColors.textPrimary,
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      ...localMatches.map((t) => _TrackListTile(
-                                            track: t,
-                                            isLocal: true,
-                                            onPlay: () => playerNotifier.playTrack(t),
-                                          )),
-                                      const SizedBox(height: 24),
-                                    ],
-
-                                    // iTunes Live Results
-                                    if (_itunesResults.isNotEmpty) ...[
-                                      Row(
-                                        children: const [
-                                          Icon(LucideIcons.globe, size: 14, color: AppColors.accent),
-                                          SizedBox(width: 6),
-                                          Text(
-                                            'Live iTunes Search Results',
-                                            style: TextStyle(
-                                              color: AppColors.textPrimary,
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      ..._itunesResults.map((t) {
-                                        final dlState = downloadStates[t.id];
-                                        return _TrackListTile(
-                                          track: t,
-                                          isLocal: false,
-                                          downloadState: dlState,
-                                          onPlay: () => playerNotifier.playTrack(t),
-                                          onDownload: () {
-                                            downloadService.downloadTrack(
-                                              trackId: t.id,
-                                              audioUrl: t.filePath,
-                                              title: t.title,
-                                              artist: t.artist,
-                                              album: t.album,
-                                              coverUrl: t.localCoverPath,
-                                              duration: t.duration,
-                                            );
-                                          },
-                                        );
-                                      }),
-                                    ],
-                                  ]
-
-                                  // --- RADIO RESULTS ---
-                                  else if (_selectedCategory == SearchCategory.radio) ...[
-                                    Row(
-                                      children: [
-                                        const Icon(LucideIcons.radio, size: 16, color: AppColors.accent),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'Live Radio Stations (${_radioResults.length})',
-                                          style: const TextStyle(
-                                            color: AppColors.textPrimary,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ],
+                                  const Icon(
+                                    LucideIcons.hardDrive,
+                                    size: 14,
+                                    color: AppColors.accent,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Offline Library Matches (${localMatches.length})',
+                                    style: const TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
                                     ),
-                                    const SizedBox(height: 10),
-                                    ..._radioResults.map((st) {
-                                      final tr = st.toTrack();
-                                      return Container(
-                                        margin: const EdgeInsets.only(bottom: 6),
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.card,
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            AlbumArtView(
-                                              imageUrl: st.favicon,
-                                              size: 44,
-                                              borderRadius: 6,
-                                              placeholderText: st.name,
-                                            ),
-                                            const SizedBox(width: 14),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    st.name,
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      color: AppColors.textPrimary,
-                                                      fontWeight: FontWeight.w600,
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    '${st.country} • ${st.tags.isNotEmpty ? st.tags : st.codec}',
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            IconButton(
-                                              tooltip: 'Play Station',
-                                              icon: Container(
-                                                width: 32,
-                                                height: 32,
-                                                decoration: const BoxDecoration(
-                                                  color: AppColors.playButtonBg,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: const Icon(LucideIcons.play, color: AppColors.playButtonIcon, size: 16),
-                                              ),
-                                              onPressed: () {
-                                                playerNotifier.playTrack(tr);
-                                                AppToast.show(context, 'Streaming "${st.name}"', icon: LucideIcons.radio);
-                                              },
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }),
-                                  ]
-
-                                  // --- PODCAST RESULTS ---
-                                  else ...[
-                                    Row(
-                                      children: [
-                                        const Icon(LucideIcons.podcast, size: 16, color: AppColors.accent),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'Podcast Shows (${_podcastResults.length})',
-                                          style: const TextStyle(
-                                            color: AppColors.textPrimary,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    ..._podcastResults.map((pod) {
-                                      return GestureDetector(
-                                        onTap: () => showPodcastEpisodesSheet(context, ref, pod),
-                                        child: Container(
-                                          margin: const EdgeInsets.only(bottom: 8),
-                                          padding: const EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.card,
-                                            borderRadius: BorderRadius.circular(10),
-                                            border: Border.all(color: AppColors.subtleHairline),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              AlbumArtView(
-                                                imageUrl: pod.artworkUrl,
-                                                size: 54,
-                                                borderRadius: 8,
-                                                placeholderText: pod.title,
-                                              ),
-                                              const SizedBox(width: 14),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      pod.title,
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                      style: const TextStyle(
-                                                        color: AppColors.textPrimary,
-                                                        fontWeight: FontWeight.w700,
-                                                        fontSize: 14,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      pod.artist,
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                      style: const TextStyle(color: AppColors.accent, fontSize: 12),
-                                                    ),
-                                                    if (pod.primaryGenre != null)
-                                                      Text(
-                                                        pod.primaryGenre!,
-                                                        style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
-                                                      ),
-                                                  ],
-                                                ),
-                                              ),
-                                              const Icon(LucideIcons.chevronRight, size: 16, color: AppColors.textMuted),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    }),
-                                  ],
-
-                                  const SizedBox(height: 100),
+                                  ),
                                 ],
                               ),
+                              const SizedBox(height: 8),
+                              ...localMatches.map(
+                                (t) => _TrackListTile(
+                                  track: t,
+                                  isLocal: true,
+                                  onPlay: () => playerNotifier.playTrack(t),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+
+                            // iTunes Live Results
+                            if (_itunesResults.isNotEmpty) ...[
+                              Row(
+                                children: const [
+                                  Icon(
+                                    LucideIcons.globe,
+                                    size: 14,
+                                    color: AppColors.accent,
+                                  ),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Live iTunes Search Results',
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              ..._itunesResults.map((t) {
+                                final dlState = downloadStates[t.id];
+                                return _TrackListTile(
+                                  track: t,
+                                  isLocal: false,
+                                  downloadState: dlState,
+                                  onPlay: () => playerNotifier.playTrack(t),
+                                  onDownload: () =>
+                                      downloadService.downloadTrackDomain(t),
+                                );
+                              }),
+                            ],
+                          ]
+                          // --- RADIO RESULTS ---
+                          else if (_selectedCategory ==
+                              SearchCategory.radio) ...[
+                            Row(
+                              children: [
+                                const Icon(
+                                  LucideIcons.radio,
+                                  size: 16,
+                                  color: AppColors.accent,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Live Radio Stations (${_radioResults.length})',
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            ..._radioResults.map((st) {
+                              final tr = st.toTrack();
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.card,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    AlbumArtView(
+                                      imageUrl: st.favicon,
+                                      size: 44,
+                                      borderRadius: 6,
+                                      placeholderText: st.name,
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            st.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: AppColors.textPrimary,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${st.country} • ${st.tags.isNotEmpty ? st.tags : st.codec}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Play Station',
+                                      icon: Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: const BoxDecoration(
+                                          color: AppColors.playButtonBg,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          LucideIcons.play,
+                                          color: AppColors.playButtonIcon,
+                                          size: 16,
+                                        ),
+                                      ),
+                                      onPressed: () {
+                                        playerNotifier.playTrack(tr);
+                                        AppToast.show(
+                                          context,
+                                          'Streaming "${st.name}"',
+                                          icon: LucideIcons.radio,
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ]
+                          // --- PODCAST RESULTS ---
+                          else ...[
+                            Row(
+                              children: [
+                                const Icon(
+                                  LucideIcons.podcast,
+                                  size: 16,
+                                  color: AppColors.accent,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Podcast Shows (${_podcastResults.length})',
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            ..._podcastResults.map((pod) {
+                              return GestureDetector(
+                                onTap: () =>
+                                    showPodcastEpisodesSheet(context, ref, pod),
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.card,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: AppColors.subtleHairline,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      AlbumArtView(
+                                        imageUrl: pod.artworkUrl,
+                                        size: 54,
+                                        borderRadius: 8,
+                                        placeholderText: pod.title,
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              pod.title,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: AppColors.textPrimary,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              pod.artist,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: AppColors.accent,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                            if (pod.primaryGenre != null)
+                                              Text(
+                                                pod.primaryGenre!,
+                                                style: const TextStyle(
+                                                  color: AppColors.textMuted,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                      const Icon(
+                                        LucideIcons.chevronRight,
+                                        size: 16,
+                                        color: AppColors.textMuted,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
+
+                          const SizedBox(height: 100),
+                        ],
+                      ),
               ),
             ],
           ),
@@ -513,7 +601,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  Widget _buildCategoryPill(SearchCategory category, IconData icon, String label) {
+  Widget _buildCategoryPill(
+    SearchCategory category,
+    IconData icon,
+    String label,
+  ) {
     final isSelected = _selectedCategory == category;
     return GestureDetector(
       onTap: () => _onCategoryChanged(category),
@@ -523,12 +615,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         decoration: BoxDecoration(
           color: isSelected ? AppColors.accent : AppColors.card,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isSelected ? AppColors.accent : AppColors.subtleHairline),
+          border: Border.all(
+            color: isSelected ? AppColors.accent : AppColors.subtleHairline,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13, color: isSelected ? Colors.black : AppColors.textSecondary),
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? Colors.black : AppColors.textSecondary,
+            ),
             const SizedBox(width: 6),
             Text(
               label,
@@ -579,7 +677,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           SizedBox(height: 12),
           Text(
             'No matching results found',
-            style: TextStyle(color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           SizedBox(height: 4),
           Text(
@@ -641,7 +743,10 @@ class _TopResultCardState extends State<_TopResultCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.accent.withAlpha(25),
                         borderRadius: BorderRadius.circular(6),
@@ -684,14 +789,23 @@ class _TopResultCardState extends State<_TopResultCard> {
               const SizedBox(width: 12),
               IconButton(
                 tooltip: 'Save to Offline Storage',
-                icon: const Icon(LucideIcons.download, color: AppColors.textSecondary, size: 20),
+                icon: const Icon(
+                  LucideIcons.download,
+                  color: AppColors.textSecondary,
+                  size: 20,
+                ),
                 onPressed: widget.onDownload,
               ),
               Consumer(
                 builder: (ctx, ref, _) => IconButton(
                   tooltip: 'More actions',
-                  icon: const Icon(LucideIcons.ellipsisVertical, color: AppColors.textSecondary, size: 20),
-                  onPressed: () => showTrackActionMenu(context, ref, widget.track),
+                  icon: const Icon(
+                    LucideIcons.ellipsisVertical,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
+                  onPressed: () =>
+                      showTrackActionMenu(context, ref, widget.track),
                 ),
               ),
               const SizedBox(width: 8),
@@ -743,7 +857,8 @@ class _TrackListTileState extends State<_TrackListTile> {
   Widget build(BuildContext context) {
     final dl = widget.downloadState;
     final isDownloading = dl?.status == DownloadStatus.downloading;
-    final isDownloaded = widget.isLocal || dl?.status == DownloadStatus.completed;
+    final isDownloaded =
+        widget.isLocal || dl?.status == DownloadStatus.completed;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -797,7 +912,10 @@ class _TrackListTileState extends State<_TrackListTile> {
               ),
               Text(
                 widget.track.durationFormatted,
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(width: 12),
               if (isDownloading)
@@ -813,23 +931,42 @@ class _TrackListTileState extends State<_TrackListTile> {
               else if (isDownloaded)
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 4),
-                  child: Icon(LucideIcons.checkCheck, size: 16, color: AppColors.accent),
+                  child: Icon(
+                    LucideIcons.checkCheck,
+                    size: 16,
+                    color: AppColors.accent,
+                  ),
                 )
               else if (widget.onDownload != null)
                 IconButton(
                   tooltip: 'Download Offline',
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  icon: const Icon(LucideIcons.download, size: 16, color: AppColors.textMuted),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  icon: const Icon(
+                    LucideIcons.download,
+                    size: 16,
+                    color: AppColors.textMuted,
+                  ),
                   onPressed: widget.onDownload,
                 ),
               Consumer(
                 builder: (ctx, ref, _) => IconButton(
                   tooltip: 'More actions',
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  icon: const Icon(LucideIcons.ellipsisVertical, size: 16, color: AppColors.textMuted),
-                  onPressed: () => showTrackActionMenu(context, ref, widget.track),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  icon: const Icon(
+                    LucideIcons.ellipsisVertical,
+                    size: 16,
+                    color: AppColors.textMuted,
+                  ),
+                  onPressed: () =>
+                      showTrackActionMenu(context, ref, widget.track),
                 ),
               ),
             ],
@@ -841,16 +978,18 @@ class _TrackListTileState extends State<_TrackListTile> {
 }
 
 /// Universal Playlist Link Importer Modal
-class _PlaylistImporterModal extends StatefulWidget {
-  final void Function(List<Track> tracks) onImportTracks;
+class _PlaylistImporterModal extends ConsumerStatefulWidget {
+  final void Function(UniversalImportResult result) onImportResult;
 
-  const _PlaylistImporterModal({required this.onImportTracks});
+  const _PlaylistImporterModal({required this.onImportResult});
 
   @override
-  State<_PlaylistImporterModal> createState() => _PlaylistImporterModalState();
+  ConsumerState<_PlaylistImporterModal> createState() =>
+      _PlaylistImporterModalState();
 }
 
-class _PlaylistImporterModalState extends State<_PlaylistImporterModal> {
+class _PlaylistImporterModalState
+    extends ConsumerState<_PlaylistImporterModal> {
   final TextEditingController _urlController = TextEditingController();
   bool _isProcessing = false;
   String _status = '';
@@ -867,26 +1006,15 @@ class _PlaylistImporterModalState extends State<_PlaylistImporterModal> {
 
     setState(() {
       _isProcessing = true;
-      _status = 'Resolving playlist items...';
+      _status = 'Importing playlist and creating offline database entries...';
     });
 
     try {
-      final lines = input.split(RegExp(r'[\n,]')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-      final searchService = ITunesSearchService();
-      final importedTracks = <Track>[];
-
-      for (final line in lines.take(15)) {
-        final query = line.replaceAll(RegExp(r'https?://[^\s]+'), '').replaceAll(RegExp(r'^\d+[\.\s]+'), '').trim();
-        final effectiveQuery = query.isNotEmpty ? query : line;
-
-        final matches = await searchService.search(effectiveQuery, limit: 1);
-        if (matches.isNotEmpty) {
-          importedTracks.add(matches.first);
-        }
-      }
+      final importer = ref.read(universalPlaylistImporterProvider);
+      final result = await importer.importPlaylist(input);
 
       if (mounted) {
-        widget.onImportTracks(importedTracks);
+        widget.onImportResult(result);
         Navigator.of(context).pop();
       }
     } catch (e) {
@@ -942,7 +1070,10 @@ class _PlaylistImporterModalState extends State<_PlaylistImporterModal> {
             style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
             decoration: InputDecoration(
               hintText: 'Paste playlist link or track names:\ne.g. Blinding Lights - The Weeknd\nStay - Kid LAROI, Justin Bieber',
-              hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+              hintStyle: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 12,
+              ),
               filled: true,
               fillColor: AppColors.card,
               border: OutlineInputBorder(
@@ -968,18 +1099,25 @@ class _PlaylistImporterModalState extends State<_PlaylistImporterModal> {
                 backgroundColor: AppColors.playButtonBg,
                 foregroundColor: AppColors.playButtonIcon,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               onPressed: _isProcessing ? null : _processImport,
               icon: _isProcessing
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.playButtonIcon),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.playButtonIcon,
+                      ),
                     )
                   : const Icon(LucideIcons.downloadCloud, size: 18),
               label: Text(
-                _isProcessing ? 'Processing Playlist...' : 'Import to Offline Library',
+                _isProcessing
+                    ? 'Processing Playlist...'
+                    : 'Import to Offline Library',
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),

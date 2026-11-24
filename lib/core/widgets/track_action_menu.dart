@@ -242,15 +242,7 @@ class _ActionList extends StatelessWidget {
           title: 'Download Offline',
           onTap: () {
             Navigator.pop(context);
-            downloadService.downloadTrack(
-              trackId: track.id,
-              audioUrl: track.filePath,
-              title: track.title,
-              artist: track.artist,
-              album: track.album,
-              coverUrl: track.localCoverPath,
-              duration: track.duration,
-            );
+            downloadService.downloadTrackDomain(track);
             AppToast.show(context, 'Started download for "${track.title}"', icon: LucideIcons.download);
           },
         ),

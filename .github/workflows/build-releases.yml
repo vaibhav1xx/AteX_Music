@@ -38,14 +38,38 @@ jobs:
       - name: Run Dart Analyzer
         run: dart analyze
 
-      - name: Build Split APKs (Android & Android TV)
+      - name: Setup Release Keystore (if secrets configured)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+            cat <<EOF > android/key.properties
+            storePassword=$KEYSTORE_PASSWORD
+            keyPassword=$KEY_PASSWORD
+            keyAlias=$KEY_ALIAS
+            storeFile=upload-keystore.jks
+            EOF
+            echo "Release keystore configured successfully"
+          else
+            echo "No keystore secrets found; building with safe debug signing fallback"
+          fi
+
+      - name: Build Split APKs (Optimized per ABI)
         run: flutter build apk --release --split-per-abi
 
-      - name: Rename APKs
+      - name: Build Universal APK
+        run: flutter build apk --release
+
+      - name: Package & Rename Android APKs
         run: |
           mkdir -p release-android
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk release-android/AteX_Music-Android-armeabi-v7a.apk
+          cp build/app/outputs/flutter-apk/app-release.apk release-android/AteX_Music-Android-Universal.apk
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk release-android/AteX_Music-Android-arm64-v8a.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk release-android/AteX_Music-Android-armeabi-v7a.apk
           cp build/app/outputs/flutter-apk/app-x86_64-release.apk release-android/AteX_Music-Android-x86_64.apk
 
       - name: Upload Android Artifacts
@@ -56,7 +80,7 @@ jobs:
           if-no-files-found: error
 
   # -------------------------------------------------------------
-  # Windows x64 Build
+  # Windows x64 Build (Portable ZIP + Inno Setup Installer)
   # -------------------------------------------------------------
   build-windows:
     name: Build Windows x64
@@ -80,21 +104,31 @@ jobs:
       - name: Build Windows Release
         run: flutter build windows --release
 
-      - name: Package Windows ZIP
+      - name: Package Windows Portable ZIP
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release-windows
-          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "release-windows\AteX_Music-Windows-x64.zip" -CompressionLevel Optimal
+          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "release-windows\AteX_Music-Windows-x64-Portable.zip" -CompressionLevel Optimal
 
-      - name: Upload Windows Artifact
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Compile Inno Setup Installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows\installer\atex_music_setup.iss
+          Copy-Item "windows\installer\Output\AteX_Music-Setup-Windows-x64.exe" -Destination "release-windows\"
+
+      - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: release-windows/AteX_Music-Windows-x64.zip
+          path: release-windows/*
           if-no-files-found: error
 
   # -------------------------------------------------------------
-  # Unsigned iOS IPA Build
+  # Unsigned iOS IPA Build (AltStore / SideStore / Scarlet)
   # -------------------------------------------------------------
   build-ios:
     name: Build Unsigned iOS IPA
@@ -169,7 +203,7 @@ jobs:
           if-no-files-found: error
 
   # -------------------------------------------------------------
-  # GitHub Release Publication
+  # GitHub Release Publication & SHA-256 Checksums
   # -------------------------------------------------------------
   publish-release:
     name: Publish GitHub Release
@@ -185,7 +219,7 @@ jobs:
           name: android-apks
           path: release-assets
 
-      - name: Download Windows Artifact
+      - name: Download Windows Artifacts
         uses: actions/download-artifact@v4
         with:
           name: windows-x64
@@ -203,6 +237,12 @@ jobs:
           name: macos-zip
           path: release-assets
 
+      - name: Generate SHA-256 Checksums
+        run: |
+          cd release-assets
+          sha256sum * > SHA256SUMS.txt
+          cd ..
+
       - name: Display Release Assets
         run: ls -la release-assets
 
@@ -214,13 +254,33 @@ jobs:
           name: AteX Music ${{ github.ref_name }}
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false
           body: |
-            ## AteX Music Release
-            100% offline-first, zero-server, multi-platform music player.
+            # AteX Music ${{ github.ref_name }} — Flagship Production Release
+            **100% Offline-First, Zero-Server Multi-Platform Music Player.**
 
-            ### Included Release Binaries:
-            - **Android & Android TV**: `AteX_Music-Android-armeabi-v7a.apk`, `AteX_Music-Android-arm64-v8a.apk`, `AteX_Music-Android-x86_64.apk`
-            - **Windows x64**: `AteX_Music-Windows-x64.zip`
-            - **iOS**: `AteX_Music-iOS-Unsigned.ipa`
-            - **macOS**: `AteX_Music-macOS.zip`
+            ---
+
+            ### 📦 Choosing the Right Binary for Your Device:
+
+            | Platform / Device | Recommended Binary | Description |
+            | :--- | :--- | :--- |
+            | **Android (Universal)** | `AteX_Music-Android-Universal.apk` | Works on all phones, tablets, car head units, and Android TV |
+            | **Android (Modern Phones)** | `AteX_Music-Android-arm64-v8a.apk` | Optimized smallest size for 64-bit ARM phones (Pixel, Galaxy, OnePlus) |
+            | **Android (Older / 32-bit)** | `AteX_Music-Android-armeabi-v7a.apk` | For older Android devices and legacy hardware |
+            | **Android TV / x86_64** | `AteX_Music-Android-x86_64.apk` | For Intel/AMD Android TV boxes and Chromebooks |
+            | **Windows (Installer)** | `AteX_Music-Setup-Windows-x64.exe` | One-click setup wizard with Start Menu and Desktop shortcuts |
+            | **Windows (Portable)** | `AteX_Music-Windows-x64-Portable.zip` | Extract and run anywhere without admin rights or installation |
+            | **macOS** | `AteX_Music-macOS.zip` | Standalone `.app` bundle for Apple Silicon and Intel Macs |
+            | **iOS (Sideload)** | `AteX_Music-iOS-Unsigned.ipa` | Sideload via AltStore, SideStore, TrollStore, or Scarlet |
+            | **Checksums** | `SHA256SUMS.txt` | Cryptographic SHA-256 hashes to verify binary integrity |
+
+            ---
+
+            ### ✨ Highlights in this Release:
+            - **Real Full-Length Audio Stream Resolver**: Resolves high-bitrate Opus / M4A streams for trending charts and searches.
+            - **Offline Downloader with LRCLIB Synced Lyrics**: Download full audio, 600x600 cover art, and `.lrc` karaoke lyrics for true Airplane Mode listening.
+            - **Universal Playlist Importer**: Paste Spotify, YouTube Music, or Amazon Music playlist links directly into SQLite storage.
+            - **Native Audio DSP & Equalizer**: Real Skip Silence, pitch shifting, speed controls (0.5x - 2.0x), and auto-pause sleep timer.
+            - **Storage Cache Manager**: Real-time MB calculation and 1-tap cache cleaner.
+            - **Curated Pro Themes**: Studio Obsidian, Pure AMOLED, Midnight Cobalt, Crimson Vinyl, and Emerald Studio with custom blurred wallpapers.

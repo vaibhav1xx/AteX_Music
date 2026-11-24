@@ -1,14 +1,20 @@
 import 'dart:io';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
+
 import '../../../data/models/track.dart';
 
 abstract class AudioPlayerHandler extends BaseAudioHandler {
-  Future<void> loadQueue(List<Track> tracks, {int initialIndex = 0, bool autoPlay = true});
+  Future<void> loadQueue(
+    List<Track> tracks, {
+    int initialIndex = 0,
+    bool autoPlay = true,
+  });
   Future<void> playTrack(Track track);
   Future<void> insertTrack(int index, Track track);
   Future<void> addTrack(Track track);
@@ -98,7 +104,11 @@ class AudioPlayerHandlerImpl extends AudioPlayerHandler {
   Stream<bool> get skipSilenceStream => _player.skipSilenceEnabledStream;
 
   @override
-  Future<void> loadQueue(List<Track> tracks, {int initialIndex = 0, bool autoPlay = true}) async {
+  Future<void> loadQueue(
+    List<Track> tracks, {
+    int initialIndex = 0,
+    bool autoPlay = true,
+  }) async {
     _tracks = List.from(tracks);
     final mediaItems = _tracks.map(_trackToMediaItem).toList();
     queue.add(mediaItems);
@@ -116,7 +126,10 @@ class AudioPlayerHandlerImpl extends AudioPlayerHandler {
     try {
       await _player.setAudioSource(
         _playlist,
-        initialIndex: initialIndex.clamp(0, _tracks.isEmpty ? 0 : _tracks.length - 1),
+        initialIndex: initialIndex.clamp(
+          0,
+          _tracks.isEmpty ? 0 : _tracks.length - 1,
+        ),
         initialPosition: Duration.zero,
       );
 
@@ -170,10 +183,9 @@ class AudioPlayerHandlerImpl extends AudioPlayerHandler {
       return AudioSource.file(file.path, tag: _trackToMediaItem(track));
     }
 
-    // Fallback: If local file path doesn't exist on disk yet (mock track),
-    // use a data URI or silent uri so the queue remains valid and non-crashing
+    // Direct URI or safe fallback so queue remains valid without throwing
     return AudioSource.uri(
-      Uri.parse('https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3'),
+      uri ?? Uri.parse('about:blank'),
       tag: _trackToMediaItem(track),
     );
   }
@@ -185,11 +197,14 @@ class AudioPlayerHandlerImpl extends AudioPlayerHandler {
       title: track.title,
       artist: track.artist,
       duration: track.duration,
-      artUri: track.localCoverPath != null && File(track.localCoverPath!).existsSync()
+      artUri:
+          track.localCoverPath != null &&
+              File(track.localCoverPath!).existsSync()
           ? Uri.file(track.localCoverPath!)
-          : (track.localCoverPath != null && track.localCoverPath!.startsWith('http')
-              ? Uri.tryParse(track.localCoverPath!)
-              : null),
+          : (track.localCoverPath != null &&
+                    track.localCoverPath!.startsWith('http')
+                ? Uri.tryParse(track.localCoverPath!)
+                : null),
       extras: {
         'filePath': track.filePath,
         'genre': track.genre,
@@ -250,7 +265,8 @@ class AudioPlayerHandlerImpl extends AudioPlayerHandler {
 
   @override
   Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
-    final enabled = shuffleMode == AudioServiceShuffleMode.all ||
+    final enabled =
+        shuffleMode == AudioServiceShuffleMode.all ||
         shuffleMode == AudioServiceShuffleMode.group;
     await _player.setShuffleModeEnabled(enabled);
   }
@@ -336,7 +352,8 @@ Future<AudioPlayerHandler> setupAudioService() async {
     config: const AudioServiceConfig(
       androidNotificationChannelId: 'com.atex.atex_music.channel.audio',
       androidNotificationChannelName: 'AteX Music Playback',
-      androidNotificationChannelDescription: 'Lossless offline audio playback engine',
+      androidNotificationChannelDescription:
+          'Lossless offline audio playback engine',
       androidNotificationOngoing: true,
       androidStopForegroundOnPause: true,
       androidShowNotificationBadge: true,

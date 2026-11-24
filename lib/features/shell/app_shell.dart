@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/widgets/atex_monogram.dart';
@@ -54,11 +56,15 @@ class _AppShellState extends ConsumerState<AppShell> {
         },
         const SingleActivator(LogicalKeyboardKey.arrowLeft): () {
           if (_isTextInputActive()) return;
-          ref.read(playerProvider.notifier).seekRelative(const Duration(seconds: -10));
+          ref
+              .read(playerProvider.notifier)
+              .seekRelative(const Duration(seconds: -10));
         },
         const SingleActivator(LogicalKeyboardKey.arrowRight): () {
           if (_isTextInputActive()) return;
-          ref.read(playerProvider.notifier).seekRelative(const Duration(seconds: 10));
+          ref
+              .read(playerProvider.notifier)
+              .seekRelative(const Duration(seconds: 10));
         },
         const SingleActivator(LogicalKeyboardKey.arrowUp): () {
           if (_isTextInputActive()) return;
@@ -82,7 +88,8 @@ class _AppShellState extends ConsumerState<AppShell> {
               final isDesktop = constraints.maxWidth >= 700;
               final themeState = ref.watch(themeProvider);
               final wallpaperPath = themeState.customWallpaperPath;
-              final hasWallpaper = wallpaperPath != null && File(wallpaperPath).existsSync();
+              final hasWallpaper =
+                  wallpaperPath != null && File(wallpaperPath).existsSync();
 
               return Stack(
                 children: [
@@ -102,13 +109,13 @@ class _AppShellState extends ConsumerState<AppShell> {
                     ),
                     Positioned.fill(
                       child: Container(
-                        color: Colors.black.withAlpha((themeState.wallpaperDim * 255).toInt()),
+                        color: Colors.black.withAlpha(
+                          (themeState.wallpaperDim * 255).toInt(),
+                        ),
                       ),
                     ),
                   ] else ...[
-                    Positioned.fill(
-                      child: Container(color: themeState.canvas),
-                    ),
+                    Positioned.fill(child: Container(color: themeState.canvas)),
                   ],
 
                   // Main App Layout
@@ -118,11 +125,14 @@ class _AppShellState extends ConsumerState<AppShell> {
                         // Integrated Frameless Desktop Drag Titlebar (Windows & macOS on desktop widths)
                         if (DesktopTitleBar.isSupported && isDesktop)
                           DesktopTitleBar(
-                            onSearchTap: () => setState(() => _currentIndex = 1),
+                            onSearchTap: () =>
+                                setState(() => _currentIndex = 1),
                           ),
 
                         // In-App Update Banner (dismissible)
-                        if (updateInfo != null && updateInfo.hasUpdate && !_updateBannerDismissed)
+                        if (updateInfo != null &&
+                            updateInfo.hasUpdate &&
+                            !_updateBannerDismissed)
                           _buildUpdateBanner(updateInfo),
 
                         // Main Responsive Layout
@@ -174,16 +184,26 @@ class _AppShellState extends ConsumerState<AppShell> {
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               minimumSize: const Size(0, 32),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            onPressed: () => UpdateCheckerService.launchUrlExternal(updateInfo.releaseUrl),
-            child: const Text('Download', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            onPressed: () =>
+                UpdateCheckerService.launchUrlExternal(updateInfo.releaseUrl),
+            child: const Text(
+              'Download',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
           ),
           const SizedBox(width: 8),
           IconButton(
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
-            icon: const Icon(LucideIcons.x, color: AppColors.textMuted, size: 16),
+            icon: const Icon(
+              LucideIcons.x,
+              color: AppColors.textMuted,
+              size: 16,
+            ),
             onPressed: () => setState(() => _updateBannerDismissed = true),
           ),
         ],
@@ -216,9 +236,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget _buildMobileLayout(BuildContext context) {
     return Stack(
       children: [
-        Positioned.fill(
-          child: _buildCurrentPage(),
-        ),
+        Positioned.fill(child: _buildCurrentPage()),
 
         // Floating Mini-Player & Bottom Nav
         Positioned(
@@ -292,13 +310,19 @@ class _AppShellState extends ConsumerState<AppShell> {
               Container(
                 width: 230,
                 color: AppColors.sidebar,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 20,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Brand Header
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       child: Row(
                         children: const [
                           AteXMonogram(size: 24, showGlow: false),
@@ -368,17 +392,26 @@ class _AppShellState extends ConsumerState<AppShell> {
                     Expanded(
                       child: Consumer(
                         builder: (context, ref, _) {
-                          final playlistsAsync = ref.watch(playlistsStreamProvider);
+                          final playlistsAsync = ref.watch(
+                            playlistsStreamProvider,
+                          );
                           final playlists = playlistsAsync.valueOrNull ?? [];
 
                           return ListView(
                             children: [
-                              _buildPlaylistLink('Favorite Songs', onTap: () => setState(() => _currentIndex = 2)),
-                              _buildPlaylistLink('Offline Downloads', onTap: () => setState(() => _currentIndex = 2)),
+                              _buildPlaylistLink(
+                                'Favorite Songs',
+                                onTap: () => setState(() => _currentIndex = 2),
+                              ),
+                              _buildPlaylistLink(
+                                'Offline Downloads',
+                                onTap: () => setState(() => _currentIndex = 2),
+                              ),
                               ...playlists.map(
                                 (pl) => _buildPlaylistLink(
                                   pl.name,
-                                  onTap: () => setState(() => _currentIndex = 2),
+                                  onTap: () =>
+                                      setState(() => _currentIndex = 2),
                                 ),
                               ),
                             ],
@@ -422,7 +455,9 @@ class _AppShellState extends ConsumerState<AppShell> {
           children: [
             Icon(
               icon,
-              color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+              color: isSelected
+                  ? AppColors.textPrimary
+                  : AppColors.textSecondary,
               size: 18,
             ),
             const SizedBox(width: 14),
@@ -432,7 +467,9 @@ class _AppShellState extends ConsumerState<AppShell> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                  color: isSelected
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   fontSize: 13,
                   letterSpacing: -0.2,
@@ -455,10 +492,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 12,
-          ),
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
         ),
       ),
     );

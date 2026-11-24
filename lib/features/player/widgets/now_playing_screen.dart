@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'dart:ui';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/widgets/track_action_menu.dart';
@@ -57,7 +59,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       _lastActiveIndex = activeIndex;
       final targetOffset = (activeIndex * 48.0) - 100.0;
       _lyricsScrollController.animateTo(
-        targetOffset.clamp(0.0, _lyricsScrollController.position.maxScrollExtent),
+        targetOffset.clamp(
+          0.0,
+          _lyricsScrollController.position.maxScrollExtent,
+        ),
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
       );
@@ -85,13 +90,17 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
     // Parse lyrics from local file if available or default LRC
     String lrcText = _defaultLrc;
-    if (track.localLyricsPath != null && File(track.localLyricsPath!).existsSync()) {
+    if (track.localLyricsPath != null &&
+        File(track.localLyricsPath!).existsSync()) {
       try {
         lrcText = File(track.localLyricsPath!).readAsStringSync();
       } catch (_) {}
     }
     final lyrics = SyncedLyricLine.parseLrc(lrcText);
-    final activeIndex = SyncedLyricLine.getActiveIndex(lyrics, playerState.position);
+    final activeIndex = SyncedLyricLine.getActiveIndex(
+      lyrics,
+      playerState.position,
+    );
     _autoScrollLyrics(activeIndex);
 
     return Scaffold(
@@ -99,9 +108,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       body: Stack(
         children: [
           // 1. Full-bleed blurred album artwork backdrop
-          Positioned.fill(
-            child: _buildBackdrop(track),
-          ),
+          Positioned.fill(child: _buildBackdrop(track)),
 
           // Deep dark gradient vignette over backdrop
           Positioned.fill(
@@ -125,12 +132,19 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               children: [
                 // Top Navigation Bar
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       IconButton(
-                        icon: const Icon(LucideIcons.chevronDown, size: 24, color: AppColors.textPrimary),
+                        icon: const Icon(
+                          LucideIcons.chevronDown,
+                          size: 24,
+                          color: AppColors.textPrimary,
+                        ),
                         onPressed: () => Navigator.of(context).pop(),
                       ),
                       Column(
@@ -163,16 +177,27 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             icon: Icon(
                               LucideIcons.slidersHorizontal,
                               size: 19,
-                              color: (playerState.speed != 1.0 || playerState.pitch != 1.0 || playerState.skipSilence || playerState.sleepTimerMinutesRemaining != null)
+                              color:
+                                  (playerState.speed != 1.0 ||
+                                      playerState.pitch != 1.0 ||
+                                      playerState.skipSilence ||
+                                      playerState.sleepTimerMinutesRemaining !=
+                                          null)
                                   ? effectiveAccent
                                   : AppColors.textPrimary,
                             ),
-                            onPressed: () => showPlaybackEffectsSheet(context, ref),
+                            onPressed: () =>
+                                showPlaybackEffectsSheet(context, ref),
                           ),
                           IconButton(
                             tooltip: 'Track Inspector & Options',
-                            icon: const Icon(LucideIcons.moreVertical, size: 20, color: AppColors.textPrimary),
-                            onPressed: () => showTrackActionMenu(context, ref, track),
+                            icon: const Icon(
+                              LucideIcons.moreVertical,
+                              size: 20,
+                              color: AppColors.textPrimary,
+                            ),
+                            onPressed: () =>
+                                showTrackActionMenu(context, ref, track),
                           ),
                         ],
                       ),
@@ -192,7 +217,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             Expanded(
                               flex: 5,
                               child: Center(
-                                child: _viewMode == NowPlayingViewMode.visualizer
+                                child:
+                                    _viewMode == NowPlayingViewMode.visualizer
                                     ? AudioVisualizerView(
                                         isPlaying: playerState.isPlaying,
                                         position: playerState.position,
@@ -207,8 +233,16 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             Expanded(
                               flex: 6,
                               child: Padding(
-                                padding: const EdgeInsets.only(right: 48, top: 20, bottom: 20),
-                                child: _buildLyricsList(lyrics, activeIndex, effectiveAccent),
+                                padding: const EdgeInsets.only(
+                                  right: 48,
+                                  top: 20,
+                                  bottom: 20,
+                                ),
+                                child: _buildLyricsList(
+                                  lyrics,
+                                  activeIndex,
+                                  effectiveAccent,
+                                ),
                               ),
                             ),
                           ],
@@ -217,18 +251,29 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 24),
                           child: switch (_viewMode) {
                             NowPlayingViewMode.visualizer => Center(
-                                child: AudioVisualizerView(
-                                  isPlaying: playerState.isPlaying,
-                                  position: playerState.position,
-                                  accentColor: effectiveAccent,
-                                  track: track,
-                                  size: (MediaQuery.sizeOf(context).width * 0.82).clamp(260.0, 360.0),
+                              child: AudioVisualizerView(
+                                isPlaying: playerState.isPlaying,
+                                position: playerState.position,
+                                accentColor: effectiveAccent,
+                                track: track,
+                                size: (MediaQuery.sizeOf(context).width * 0.82)
+                                    .clamp(260.0, 360.0),
+                              ),
+                            ),
+                            NowPlayingViewMode.lyrics => _buildLyricsList(
+                              lyrics,
+                              activeIndex,
+                              effectiveAccent,
+                            ),
+                            NowPlayingViewMode.cover => Center(
+                              child: _buildCoverArea(
+                                track,
+                                (MediaQuery.sizeOf(context).width * 0.78).clamp(
+                                  240.0,
+                                  360.0,
                                 ),
                               ),
-                            NowPlayingViewMode.lyrics => _buildLyricsList(lyrics, activeIndex, effectiveAccent),
-                            NowPlayingViewMode.cover => Center(
-                                child: _buildCoverArea(track, (MediaQuery.sizeOf(context).width * 0.78).clamp(240.0, 360.0)),
-                              ),
+                            ),
                           },
                         ),
                 ),
@@ -274,13 +319,22 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             ),
                             IconButton(
                               tooltip: 'Track Info & Audio Inspector',
-                              icon: const Icon(LucideIcons.info, size: 20, color: AppColors.textMuted),
-                              onPressed: () => showTrackInfoSheet(context, track),
+                              icon: const Icon(
+                                LucideIcons.info,
+                                size: 20,
+                                color: AppColors.textMuted,
+                              ),
+                              onPressed: () =>
+                                  showTrackInfoSheet(context, track),
                             ),
                             IconButton(
                               icon: Icon(
-                                track.isFavorite ? LucideIcons.heart : LucideIcons.heart,
-                                color: track.isFavorite ? AppColors.accent : AppColors.textMuted,
+                                track.isFavorite
+                                    ? LucideIcons.heart
+                                    : LucideIcons.heart,
+                                color: track.isFavorite
+                                    ? AppColors.accent
+                                    : AppColors.textMuted,
                                 size: 22,
                               ),
                               onPressed: () => notifier.toggleFavorite(),
@@ -296,13 +350,20 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             activeTrackColor: AppColors.accent,
                             inactiveTrackColor: Colors.white.withAlpha(30),
                             thumbColor: Colors.white,
-                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 6,
+                            ),
+                            overlayShape: const RoundSliderOverlayShape(
+                              overlayRadius: 10,
+                            ),
                           ),
                           child: Slider(
                             value: playerState.position.inSeconds
                                 .toDouble()
-                                .clamp(0.0, playerState.duration.inSeconds.toDouble()),
+                                .clamp(
+                                  0.0,
+                                  playerState.duration.inSeconds.toDouble(),
+                                ),
                             max: playerState.duration.inSeconds > 0
                                 ? playerState.duration.inSeconds.toDouble()
                                 : 1.0,
@@ -320,11 +381,17 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             children: [
                               Text(
                                 _formatDuration(playerState.position),
-                                style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                                style: const TextStyle(
+                                  color: AppColors.textMuted,
+                                  fontSize: 11,
+                                ),
                               ),
                               Text(
                                 _formatDuration(playerState.duration),
-                                style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                                style: const TextStyle(
+                                  color: AppColors.textMuted,
+                                  fontSize: 11,
+                                ),
                               ),
                             ],
                           ),
@@ -340,7 +407,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                               icon: Icon(
                                 LucideIcons.shuffle,
                                 size: 20,
-                                color: playerState.isShuffle ? AppColors.accent : AppColors.textMuted,
+                                color: playerState.isShuffle
+                                    ? AppColors.accent
+                                    : AppColors.textMuted,
                               ),
                               onPressed: () => notifier.toggleShuffle(),
                             ),
@@ -364,11 +433,22 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   color: AppColors.playButtonBg,
                                 ),
                                 child: Center(
-                                  child: Icon(
-                                    playerState.isPlaying ? LucideIcons.pause : LucideIcons.play,
-                                    color: AppColors.playButtonIcon,
-                                    size: 26,
-                                  ),
+                                  child: playerState.isResolving
+                                      ? const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: AppColors.playButtonIcon,
+                                          ),
+                                        )
+                                      : Icon(
+                                          playerState.isPlaying
+                                              ? LucideIcons.pause
+                                              : LucideIcons.play,
+                                          color: AppColors.playButtonIcon,
+                                          size: 26,
+                                        ),
                                 ),
                               ),
                             ),
@@ -388,7 +468,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                     ? LucideIcons.repeat1
                                     : LucideIcons.repeat,
                                 size: 20,
-                                color: playerState.repeatMode != PlaybackRepeatMode.off
+                                color:
+                                    playerState.repeatMode !=
+                                        PlaybackRepeatMode.off
                                     ? AppColors.accent
                                     : AppColors.textMuted,
                               ),
@@ -403,16 +485,24 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               TextButton.icon(
-                                onPressed: () => setState(() => _mobileShowLyrics = !_mobileShowLyrics),
+                                onPressed: () => setState(
+                                  () => _mobileShowLyrics = !_mobileShowLyrics,
+                                ),
                                 icon: Icon(
                                   LucideIcons.mic2,
                                   size: 16,
-                                  color: _mobileShowLyrics ? AppColors.accent : AppColors.textMuted,
+                                  color: _mobileShowLyrics
+                                      ? AppColors.accent
+                                      : AppColors.textMuted,
                                 ),
                                 label: Text(
-                                  _mobileShowLyrics ? 'Show Artwork' : 'Karaoke Lyrics',
+                                  _mobileShowLyrics
+                                      ? 'Show Artwork'
+                                      : 'Karaoke Lyrics',
                                   style: TextStyle(
-                                    color: _mobileShowLyrics ? AppColors.accent : AppColors.textMuted,
+                                    color: _mobileShowLyrics
+                                        ? AppColors.accent
+                                        : AppColors.textMuted,
                                     fontSize: 12,
                                   ),
                                 ),
@@ -433,7 +523,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   }
 
   Widget _buildBackdrop(Track track) {
-    if (track.localCoverPath != null && track.localCoverPath!.startsWith('http')) {
+    if (track.localCoverPath != null &&
+        track.localCoverPath!.startsWith('http')) {
       return CachedNetworkImage(
         imageUrl: track.localCoverPath!,
         fit: BoxFit.cover,
@@ -443,9 +534,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             child: Image(image: imageProvider, fit: BoxFit.cover),
           );
         },
-        errorWidget: (context, url, error) => Container(color: AppColors.sidebar),
+        errorWidget: (context, url, error) =>
+            Container(color: AppColors.sidebar),
       );
-    } else if (track.localCoverPath != null && File(track.localCoverPath!).existsSync()) {
+    } else if (track.localCoverPath != null &&
+        File(track.localCoverPath!).existsSync()) {
       return ImageFiltered(
         imageFilter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
         child: Image.file(File(track.localCoverPath!), fit: BoxFit.cover),
@@ -482,15 +575,35 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildSegmentItem(NowPlayingViewMode.cover, LucideIcons.disc, 'Cover', accent),
-          _buildSegmentItem(NowPlayingViewMode.visualizer, LucideIcons.activity, 'Visualizer', accent),
-          _buildSegmentItem(NowPlayingViewMode.lyrics, LucideIcons.mic2, 'Lyrics', accent),
+          _buildSegmentItem(
+            NowPlayingViewMode.cover,
+            LucideIcons.disc,
+            'Cover',
+            accent,
+          ),
+          _buildSegmentItem(
+            NowPlayingViewMode.visualizer,
+            LucideIcons.activity,
+            'Visualizer',
+            accent,
+          ),
+          _buildSegmentItem(
+            NowPlayingViewMode.lyrics,
+            LucideIcons.mic2,
+            'Lyrics',
+            accent,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSegmentItem(NowPlayingViewMode mode, IconData icon, String label, Color accent) {
+  Widget _buildSegmentItem(
+    NowPlayingViewMode mode,
+    IconData icon,
+    String label,
+    Color accent,
+  ) {
     final isSelected = _viewMode == mode;
     return GestureDetector(
       onTap: () => setState(() => _viewMode = mode),
@@ -525,7 +638,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     );
   }
 
-  Widget _buildLyricsList(List<SyncedLyricLine> lines, int activeIndex, [Color? accent]) {
+  Widget _buildLyricsList(
+    List<SyncedLyricLine> lines,
+    int activeIndex, [
+    Color? accent,
+  ]) {
     final effectiveAccent = accent ?? AppColors.accent;
     if (lines.isEmpty) {
       return const Center(
@@ -549,7 +666,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
           child: Text(
             line.text,
             style: TextStyle(
-              color: isActive ? effectiveAccent : AppColors.textMuted.withAlpha(140),
+              color: isActive
+                  ? effectiveAccent
+                  : AppColors.textMuted.withAlpha(140),
               fontSize: isActive ? 22 : 16,
               fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
               letterSpacing: isActive ? -0.4 : 0,

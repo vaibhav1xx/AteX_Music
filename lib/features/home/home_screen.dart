@@ -490,16 +490,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
 
       SliverToBoxAdapter(
-        child: SizedBox(
-          height: 228,
-          child: trendingSongs.isEmpty
-              ? Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isDesktop ? 36 : 20,
-                  ),
-                  child: const ShimmerHorizontalCharts(),
-                )
-              : ListView.separated(
+        child: trendingSongs.isNotEmpty
+            ? SizedBox(
+                height: 228,
+                child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: EdgeInsets.symmetric(
                     horizontal: isDesktop ? 36 : 20,
@@ -514,7 +508,186 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     );
                   },
                 ),
-        ),
+              )
+            : (trendingSongsAsync.isLoading
+                ? SizedBox(
+                    height: 228,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isDesktop ? 36 : 20,
+                      ),
+                      child: const ShimmerHorizontalCharts(),
+                    ),
+                  )
+                : Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isDesktop ? 36 : 20,
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isNarrow = constraints.maxWidth < 600;
+                        if (isNarrow) {
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.card,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.subtleHairline),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.cardHover,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(
+                                        LucideIcons.wifiOff,
+                                        size: 20,
+                                        color: AppColors.textMuted,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Expanded(
+                                      child: Text(
+                                        'Offline Mode Active',
+                                        style: TextStyle(
+                                          color: AppColors.textPrimary,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Connect to Wi-Fi to load trending charts, or enjoy your local library with zero internet.',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.playButtonBg,
+                                      foregroundColor: AppColors.playButtonIcon,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 10,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    onPressed: _isScanning ? null : _triggerScan,
+                                    icon: const Icon(
+                                      LucideIcons.folderDown,
+                                      size: 14,
+                                    ),
+                                    label: const Text(
+                                      'Scan Music',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: AppColors.card,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.subtleHairline),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: AppColors.cardHover,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  LucideIcons.wifiOff,
+                                  size: 24,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Offline Mode Active',
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'Connect to Wi-Fi to load trending charts, or enjoy your local library with zero internet.',
+                                      style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.playButtonBg,
+                                  foregroundColor: AppColors.playButtonIcon,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 10,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onPressed: _isScanning ? null : _triggerScan,
+                                icon: const Icon(
+                                  LucideIcons.folderDown,
+                                  size: 14,
+                                ),
+                                label: const Text(
+                                  'Scan Music',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  )),
       ),
 
       if (trendingAlbums.isNotEmpty) ...[
@@ -614,10 +787,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             loading: () => const Center(
               child: CircularProgressIndicator(color: AppColors.accent),
             ),
-            error: (err, _) => Center(
-              child: Text(
-                'Error loading stations: $err',
-                style: const TextStyle(color: Colors.redAccent),
+            error: (_, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(
+                      LucideIcons.wifiOff,
+                      size: 16,
+                      color: AppColors.textMuted,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Live Radio stations require an active internet connection.',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -851,11 +1041,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: CircularProgressIndicator(color: AppColors.accent),
           ),
         ),
-        error: (err, _) => SliverToBoxAdapter(
+        error: (_, _) => SliverToBoxAdapter(
           child: Center(
-            child: Text(
-              'Error loading podcasts: $err',
-              style: const TextStyle(color: Colors.redAccent),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(
+                    LucideIcons.wifiOff,
+                    size: 16,
+                    color: AppColors.textMuted,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Podcasts require an active internet connection to refresh episodes.',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

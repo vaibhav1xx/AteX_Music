@@ -1,8 +1,13 @@
 import 'dart:async';
+import 'dart:io';
+
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../data/database/app_database.dart';
 import '../../../data/models/track.dart';
+import '../../../data/services/audio_stream_resolver.dart';
 import '../services/audio_player_handler.dart';
 
 enum PlaybackRepeatMode { off, all, one }
@@ -23,6 +28,7 @@ class PlayerState {
   final List<Track> queue;
   final int queueIndex;
   final bool isLyricsVisible;
+  final bool isResolving;
 
   const PlayerState({
     required this.currentTrack,
@@ -40,6 +46,7 @@ class PlayerState {
     required this.queue,
     this.queueIndex = 0,
     this.isLyricsVisible = false,
+    this.isResolving = false,
   });
 
   PlayerState copyWith({
@@ -59,6 +66,7 @@ class PlayerState {
     List<Track>? queue,
     int? queueIndex,
     bool? isLyricsVisible,
+    bool? isResolving,
   }) {
     return PlayerState(
       currentTrack: currentTrack ?? this.currentTrack,
@@ -71,13 +79,16 @@ class PlayerState {
       speed: speed ?? this.speed,
       pitch: pitch ?? this.pitch,
       skipSilence: skipSilence ?? this.skipSilence,
-      sleepTimerMinutesRemaining:
-          clearSleepTimer ? null : (sleepTimerMinutesRemaining ?? this.sleepTimerMinutesRemaining),
-      sleepTimerEndTime:
-          clearSleepTimer ? null : (sleepTimerEndTime ?? this.sleepTimerEndTime),
+      sleepTimerMinutesRemaining: clearSleepTimer
+          ? null
+          : (sleepTimerMinutesRemaining ?? this.sleepTimerMinutesRemaining),
+      sleepTimerEndTime: clearSleepTimer
+          ? null
+          : (sleepTimerEndTime ?? this.sleepTimerEndTime),
       queue: queue ?? this.queue,
       queueIndex: queueIndex ?? this.queueIndex,
       isLyricsVisible: isLyricsVisible ?? this.isLyricsVisible,
+      isResolving: isResolving ?? this.isResolving,
     );
   }
 
@@ -95,6 +106,7 @@ final audioHandlerProvider = Provider<AudioPlayerHandler>((ref) {
 class PlayerNotifier extends StateNotifier<PlayerState> {
   final AudioPlayerHandler _audioHandler;
   final AppDatabase _database;
+  final AudioStreamResolver _streamResolver;
 
   StreamSubscription? _playbackStateSub;
   StreamSubscription? _positionSub;
@@ -119,16 +131,17 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
     isFavorite: false,
   );
 
-  PlayerNotifier(this._audioHandler, this._database)
-      : super(
-          const PlayerState(
-            currentTrack: idleTrack,
-            duration: Duration.zero,
-            queue: [],
-            queueIndex: 0,
-            isPlaying: false,
-          ),
-        ) {
+  PlayerNotifier(this._audioHandler, this._database, [AudioStreamResolver? streamResolver])
+    : _streamResolver = streamResolver ?? AudioStreamResolver(),
+      super(
+        const PlayerState(
+          currentTrack: idleTrack,
+          duration: Duration.zero,
+          queue: [],
+          queueIndex: 0,
+          isPlaying: false,
+        ),
+      ) {
     _initSubscriptions();
   }
 
@@ -204,10 +217,7 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
             filePath: (item.extras?['filePath'] as String?) ?? '',
             isFavorite: (item.extras?['isFavorite'] as bool?) ?? false,
           );
-          state = state.copyWith(
-            currentTrack: track,
-            duration: track.duration,
-          );
+          state = state.copyWith(currentTrack: track, duration: track.duration);
         }
       }
     });
@@ -224,28 +234,113 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
   Future<void> playTrack(Track track) async {
     _hasRecordedCurrentPlay = false;
     _lastTrackIdRecorded = track.id;
-    final idx = state.queue.indexWhere((t) => t.id == track.id);
+    final isLocal = track.filePath.isNotEmpty && File(track.filePath).existsSync();
+
+    if (isLocal) {
+      final idx = state.queue.indexWhere((t) => t.id == track.id);
+      state = state.copyWith(
+        currentTrack: track,
+        isResolving: false,
+        duration: track.duration,
+        position: Duration.zero,
+        queueIndex: idx >= 0 ? idx : 0,
+      );
+      await _audioHandler.playTrack(track);
+      return;
+    }
+
+    // Remote or stream track: show crisp loading indicator on play button while resolving full audio
     state = state.copyWith(
       currentTrack: track,
-      duration: track.duration,
+      isResolving: true,
+      isPlaying: true,
       position: Duration.zero,
-      queueIndex: idx >= 0 ? idx : 0,
+      duration: track.duration,
+      queue: [track],
+      queueIndex: 0,
     );
-    await _audioHandler.playTrack(track);
+
+    try {
+      final resolved = await _streamResolver.resolveTrack(track);
+      state = state.copyWith(
+        currentTrack: resolved,
+        isResolving: false,
+        duration: resolved.duration,
+        queue: [resolved],
+      );
+      await _audioHandler.playTrack(resolved);
+    } catch (e) {
+      debugPrint('[PlayerNotifier] Error resolving stream track: $e');
+      state = state.copyWith(isResolving: false);
+      await _audioHandler.playTrack(track);
+    }
   }
 
-  Future<void> loadAndPlayQueue(List<Track> tracks, {int startIndex = 0}) async {
+  Future<void> loadAndPlayQueue(
+    List<Track> tracks, {
+    int startIndex = 0,
+  }) async {
     if (tracks.isEmpty) return;
+    final clampedIndex = startIndex.clamp(0, tracks.length - 1);
+    final targetTrack = tracks[clampedIndex];
     _hasRecordedCurrentPlay = false;
-    _lastTrackIdRecorded = tracks[startIndex].id;
+    _lastTrackIdRecorded = targetTrack.id;
+
+    final isLocal = targetTrack.filePath.isNotEmpty && File(targetTrack.filePath).existsSync();
+
+    if (isLocal) {
+      state = state.copyWith(
+        queue: tracks,
+        queueIndex: clampedIndex,
+        currentTrack: targetTrack,
+        isResolving: false,
+        duration: targetTrack.duration,
+        position: Duration.zero,
+      );
+      await _audioHandler.loadQueue(
+        tracks,
+        initialIndex: clampedIndex,
+        autoPlay: true,
+      );
+      return;
+    }
+
+    // Remote track in queue: resolve full stream before playing
     state = state.copyWith(
       queue: tracks,
-      queueIndex: startIndex,
-      currentTrack: tracks[startIndex],
-      duration: tracks[startIndex].duration,
+      queueIndex: clampedIndex,
+      currentTrack: targetTrack,
+      isResolving: true,
+      isPlaying: true,
+      duration: targetTrack.duration,
       position: Duration.zero,
     );
-    await _audioHandler.loadQueue(tracks, initialIndex: startIndex, autoPlay: true);
+
+    try {
+      final resolved = await _streamResolver.resolveTrack(targetTrack);
+      final updatedQueue = List<Track>.from(tracks);
+      updatedQueue[clampedIndex] = resolved;
+
+      state = state.copyWith(
+        queue: updatedQueue,
+        currentTrack: resolved,
+        isResolving: false,
+        duration: resolved.duration,
+      );
+      await _audioHandler.loadQueue(
+        updatedQueue,
+        initialIndex: clampedIndex,
+        autoPlay: true,
+      );
+    } catch (e) {
+      debugPrint('[PlayerNotifier] Error resolving queue track: $e');
+      state = state.copyWith(isResolving: false);
+      await _audioHandler.loadQueue(
+        tracks,
+        initialIndex: clampedIndex,
+        autoPlay: true,
+      );
+    }
   }
 
   Future<void> seekTo(Duration position) async {
@@ -293,37 +388,31 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
       return t.id == updated.id ? updated : t;
     }).toList();
 
-    state = state.copyWith(
-      currentTrack: updated,
-      queue: updatedQueue,
-    );
+    state = state.copyWith(currentTrack: updated, queue: updatedQueue);
 
     await _database.toggleTrackFavorite(updated.id);
   }
 
   void updateTrackMetadata(Track updated) {
-    final updatedQueue = state.queue.map((t) => t.id == updated.id ? updated : t).toList();
-    final updatedCurrent = state.currentTrack.id == updated.id ? updated : state.currentTrack;
-    state = state.copyWith(
-      currentTrack: updatedCurrent,
-      queue: updatedQueue,
-    );
+    final updatedQueue = state.queue
+        .map((t) => t.id == updated.id ? updated : t)
+        .toList();
+    final updatedCurrent = state.currentTrack.id == updated.id
+        ? updated
+        : state.currentTrack;
+    state = state.copyWith(currentTrack: updatedCurrent, queue: updatedQueue);
   }
 
   Future<void> toggleTrackFavorite(Track track) async {
-    final updated = track.copyWith(
-      isFavorite: !track.isFavorite,
-    );
+    final updated = track.copyWith(isFavorite: !track.isFavorite);
     final updatedQueue = state.queue.map((t) {
       return t.id == updated.id ? updated : t;
     }).toList();
-    final updatedCurrent =
-        state.currentTrack.id == updated.id ? updated : state.currentTrack;
+    final updatedCurrent = state.currentTrack.id == updated.id
+        ? updated
+        : state.currentTrack;
 
-    state = state.copyWith(
-      currentTrack: updatedCurrent,
-      queue: updatedQueue,
-    );
+    state = state.copyWith(currentTrack: updatedCurrent, queue: updatedQueue);
 
     await _database.toggleTrackFavorite(updated.id);
   }
@@ -334,7 +423,8 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
       return;
     }
     final nextIndex = (state.queueIndex + 1).clamp(0, state.queue.length);
-    final updatedQueue = List<Track>.from(state.queue)..insert(nextIndex, track);
+    final updatedQueue = List<Track>.from(state.queue)
+      ..insert(nextIndex, track);
     state = state.copyWith(queue: updatedQueue);
     await _audioHandler.insertTrack(nextIndex, track);
   }
@@ -464,8 +554,11 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
   }
 }
 
-final playerProvider = StateNotifierProvider<PlayerNotifier, PlayerState>((ref) {
+final playerProvider = StateNotifierProvider<PlayerNotifier, PlayerState>((
+  ref,
+) {
   final audioHandler = ref.watch(audioHandlerProvider);
   final db = ref.watch(appDatabaseProvider);
-  return PlayerNotifier(audioHandler, db);
+  final resolver = ref.watch(audioStreamResolverProvider);
+  return PlayerNotifier(audioHandler, db, resolver);
 });
