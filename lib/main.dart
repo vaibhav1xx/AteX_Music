@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_provider.dart';
 import 'features/player/providers/player_provider.dart';
 import 'features/player/services/audio_player_handler.dart';
 import 'features/shell/app_shell.dart';
@@ -49,15 +50,17 @@ void main() async {
   );
 }
 
-class AteXMusicApp extends StatelessWidget {
+class AteXMusicApp extends ConsumerWidget {
   const AteXMusicApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeState = ref.watch(themeProvider);
+
     return MaterialApp(
       title: 'AteX Music',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.buildTheme(themeState),
       home: const AppShell(),
     );
   }

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -7,8 +8,10 @@ import '../../core/widgets/track_action_menu.dart';
 import '../../data/database/app_database.dart';
 import '../../data/models/track.dart';
 import '../../data/scanner/music_scanner.dart';
+import '../../data/services/playlist_file_service.dart';
 import '../player/providers/player_provider.dart';
 import '../player/widgets/album_art_view.dart';
+import 'widgets/duplicate_cleaner_dialog.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
@@ -25,7 +28,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -42,26 +45,30 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     try {
       final result = await scanner.scanAndImport(db);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.statusMessage),
-          backgroundColor: result.success ? AppColors.surfaceElevated : Colors.red.shade900,
-          duration: const Duration(seconds: 3),
-        ),
+      AppToast.show(
+        context,
+        result.statusMessage,
+        icon: result.success ? LucideIcons.check : LucideIcons.alertCircle,
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Scanner error: $e'),
-          backgroundColor: Colors.red.shade900,
-        ),
-      );
+      AppToast.show(context, 'Scanner error: $e', icon: LucideIcons.alertCircle);
     } finally {
       if (mounted) {
         setState(() => _isScanning = false);
       }
     }
+  }
+
+  Future<void> _importPlaylistFile() async {
+    final db = ref.read(appDatabaseProvider);
+    final result = await PlaylistFileService.importPlaylist(db);
+    if (!mounted) return;
+    AppToast.show(
+      context,
+      result.message,
+      icon: result.success ? LucideIcons.fileCheck : LucideIcons.alertCircle,
+    );
   }
 
   @override
@@ -111,13 +118,37 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                       ),
                     ],
                   ),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
                     children: [
+                      // Duplicate Finder Tool
+                      IconButton(
+                        tooltip: 'Find & Clean Duplicates',
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.card,
+                          padding: const EdgeInsets.all(10),
+                        ),
+                        icon: const Icon(LucideIcons.copy, size: 16, color: AppColors.accent),
+                        onPressed: () => showDuplicateCleanerDialog(context, ref),
+                      ),
+
+                      // Import M3U/JSON Playlist Button
+                      IconButton(
+                        tooltip: 'Import M3U / M3U8 / JSON Playlist',
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.card,
+                          padding: const EdgeInsets.all(10),
+                        ),
+                        icon: const Icon(LucideIcons.fileUp, size: 16, color: AppColors.accent),
+                        onPressed: _importPlaylistFile,
+                      ),
+
                       // Offline Only filter toggle
                       GestureDetector(
                         onTap: () => setState(() => _offlineOnly = !_offlineOnly),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                           decoration: BoxDecoration(
                             color: _offlineOnly ? AppColors.accent.withAlpha(30) : AppColors.card,
                             borderRadius: BorderRadius.circular(16),
@@ -135,7 +166,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.cardHover,
@@ -153,7 +184,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                               )
                             : const Icon(LucideIcons.folderDown, size: 16, color: AppColors.accent),
                         label: Text(
-                          _isScanning ? 'Importing...' : 'Scan / Import Music',
+                          _isScanning ? 'Importing...' : 'Scan Music',
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -173,10 +204,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                 labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                 dividerColor: AppColors.dockHairline,
                 tabs: const [
+                  Tab(text: 'Auto-Mixes'),
                   Tab(text: 'Tracks'),
                   Tab(text: 'Albums'),
                   Tab(text: 'Playlists'),
-                  Tab(text: 'Local Folders'),
+                  Tab(text: 'Folders'),
                 ],
               ),
               const SizedBox(height: 16),
@@ -186,7 +218,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    // Tab 1: Tracks List
+                    // Tab 1: Smart Auto-Mixes
+                    _buildSmartAutoMixesTab(isDesktop, playerNotifier),
+
+                    // Tab 2: Tracks List
                     tracks.isEmpty
                         ? _buildEmptyLibraryPrompt()
                         : ListView.separated(
@@ -203,16 +238,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                             },
                           ),
 
-                    // Tab 2: Albums Grid
+                    // Tab 3: Albums Grid
                     tracks.isEmpty
                         ? _buildEmptyLibraryPrompt()
                         : _buildAlbumsGrid(tracks, isDesktop, playerNotifier),
 
-                    // Tab 3: Playlists List
-                    _buildPlaylistsTab(),
+                    // Tab 4: Playlists List
+                    _buildPlaylistsTab(tracks),
 
-                    // Tab 4: Local Storage Folders
-                    _buildFoldersTab(tracks.length),
+                    // Tab 5: Local Storage Real Folder Browser
+                    _buildRealFoldersTab(tracks, playerNotifier),
                   ],
                 ),
               ),
@@ -220,6 +255,166 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // SMART AUTO-MIXES TAB (Most Played, Recently Added, Favorites, Forgotten Gems)
+  // =========================================================================
+  Widget _buildSmartAutoMixesTab(bool isDesktop, PlayerNotifier notifier) {
+    final mostPlayedAsync = ref.watch(mostPlayedTracksStreamProvider);
+    final recentlyAddedAsync = ref.watch(recentlyAddedTracksStreamProvider);
+    final favoritesAsync = ref.watch(favoriteTracksStreamProvider);
+    final forgottenGemsAsync = ref.watch(forgottenGemsTracksStreamProvider);
+
+    final mostPlayed = mostPlayedAsync.valueOrNull?.map((d) => d.toDomain()).toList() ?? [];
+    final recentlyAdded = recentlyAddedAsync.valueOrNull?.map((d) => d.toDomain()).toList() ?? [];
+    final favorites = favoritesAsync.valueOrNull?.map((d) => d.toDomain()).toList() ?? [];
+    final forgottenGems = forgottenGemsAsync.valueOrNull?.map((d) => d.toDomain()).toList() ?? [];
+
+    return ListView(
+      children: [
+        const Text(
+          'DYNAMIC SMART MIXES',
+          style: TextStyle(
+            color: AppColors.accent,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Generated automatically from local SQLite listening statistics and dates.',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+        ),
+        const SizedBox(height: 16),
+
+        _buildAutoMixCard(
+          title: 'Most Played Mix',
+          subtitle: '${mostPlayed.length} songs you listen to repeatedly',
+          icon: LucideIcons.flame,
+          accentColor: Colors.deepOrangeAccent,
+          tracks: mostPlayed,
+          onPlay: () => notifier.loadAndPlayQueue(mostPlayed),
+          onExportM3u: () => _exportMix('Most_Played_Mix', mostPlayed),
+        ),
+        const SizedBox(height: 12),
+
+        _buildAutoMixCard(
+          title: 'Recently Added',
+          subtitle: '${recentlyAdded.length} fresh audio files scanned to device',
+          icon: LucideIcons.sparkles,
+          accentColor: AppColors.accent,
+          tracks: recentlyAdded,
+          onPlay: () => notifier.loadAndPlayQueue(recentlyAdded),
+          onExportM3u: () => _exportMix('Recently_Added_Mix', recentlyAdded),
+        ),
+        const SizedBox(height: 12),
+
+        _buildAutoMixCard(
+          title: 'Favorites Mix',
+          subtitle: '${favorites.length} curated starred tracks',
+          icon: LucideIcons.heart,
+          accentColor: Colors.pinkAccent,
+          tracks: favorites,
+          onPlay: () => notifier.loadAndPlayQueue(favorites),
+          onExportM3u: () => _exportMix('Favorites_Mix', favorites),
+        ),
+        const SizedBox(height: 12),
+
+        _buildAutoMixCard(
+          title: 'Forgotten Gems',
+          subtitle: '${forgottenGems.length} library tracks you haven\'t played in a while',
+          icon: LucideIcons.compass,
+          accentColor: const Color(0xFF818CF8),
+          tracks: forgottenGems,
+          onPlay: () => notifier.loadAndPlayQueue(forgottenGems),
+          onExportM3u: () => _exportMix('Forgotten_Gems_Mix', forgottenGems),
+        ),
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Future<void> _exportMix(String name, List<Track> tracks) async {
+    final result = await PlaylistFileService.exportToM3u(name, tracks);
+    if (!mounted) return;
+    AppToast.show(
+      context,
+      result.message,
+      icon: result.success ? LucideIcons.fileCheck : LucideIcons.alertCircle,
+    );
+  }
+
+  Widget _buildAutoMixCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color accentColor,
+    required List<Track> tracks,
+    required VoidCallback onPlay,
+    required VoidCallback onExportM3u,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.subtleHairline),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: accentColor.withAlpha(25),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: accentColor, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Export M3U8',
+            icon: const Icon(LucideIcons.share, size: 16, color: AppColors.textMuted),
+            onPressed: tracks.isEmpty ? null : onExportM3u,
+          ),
+          const SizedBox(width: 6),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.playButtonBg,
+              foregroundColor: AppColors.playButtonIcon,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: tracks.isEmpty ? null : onPlay,
+            icon: const Icon(LucideIcons.play, size: 14),
+            label: const Text('Play Mix', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+          ),
+        ],
       ),
     );
   }
@@ -338,9 +533,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     );
   }
 
-  Widget _buildPlaylistsTab() {
+  Widget _buildPlaylistsTab(List<Track> allTracks) {
     final playlistsAsync = ref.watch(playlistsStreamProvider);
     final playlists = playlistsAsync.valueOrNull ?? [];
+    final db = ref.read(appDatabaseProvider);
+    final playerNotifier = ref.read(playerProvider.notifier);
 
     return ListView(
       children: [
@@ -396,8 +593,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
         _buildPlaylistTile('Favorite Tracks', 'All your liked tracks', LucideIcons.heart),
         const SizedBox(height: 8),
         _buildPlaylistTile('Recently Added', 'Latest imported local audio', LucideIcons.clock),
-        const SizedBox(height: 8),
-        _buildPlaylistTile('High Resolution Lossless', 'FLAC and 24-bit audio tracks', LucideIcons.disc),
         const SizedBox(height: 8),
 
         // User Playlists from Drift Database
@@ -456,9 +651,34 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                       ),
                     ),
                     IconButton(
+                      tooltip: 'Play Playlist',
+                      icon: const Icon(LucideIcons.play, size: 16, color: AppColors.accent),
+                      onPressed: () async {
+                        final plTracks = await db.getTracksForPlaylist(pl.id);
+                        if (!mounted) return;
+                        if (plTracks.isNotEmpty) {
+                          playerNotifier.loadAndPlayQueue(plTracks.map((d) => d.toDomain()).toList());
+                          if (mounted) {
+                            AppToast.show(context, 'Playing "${pl.name}"', icon: LucideIcons.play);
+                          }
+                        }
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'Export Playlist (.m3u8)',
+                      icon: const Icon(LucideIcons.share, size: 16, color: AppColors.textMuted),
+                      onPressed: () async {
+                        final plTracks = await db.getTracksForPlaylist(pl.id);
+                        final domainTracks = plTracks.map((d) => d.toDomain()).toList();
+                        final res = await PlaylistFileService.exportToM3u(pl.name, domainTracks);
+                        if (!mounted) return;
+                        AppToast.show(context, res.message, icon: LucideIcons.fileCheck);
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'Delete Playlist',
                       icon: const Icon(LucideIcons.trash2, size: 16, color: AppColors.textMuted),
                       onPressed: () async {
-                        final db = ref.read(appDatabaseProvider);
                         await db.deletePlaylist(pl.id);
                         if (!mounted) return;
                         AppToast.show(context, 'Deleted "${pl.name}"', icon: LucideIcons.trash);
@@ -522,68 +742,102 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     );
   }
 
-  Widget _buildFoldersTab(int count) {
-    return ListView(
-      children: [
-        _buildFolderRow('Primary Device Music Storage', '/storage/emulated/0/Music', count),
-        const SizedBox(height: 8),
-        _buildFolderRow('AteX Offline Downloads Directory', 'AteX_Music/Media', count),
-        const SizedBox(height: 8),
-        _buildFolderRow('Desktop User Audio Library', 'C:\\Users\\Music', count),
-      ],
-    );
-  }
+  // =========================================================================
+  // REAL FOLDER BROWSER TAB (Grouping local tracks by parent directory)
+  // =========================================================================
+  Widget _buildRealFoldersTab(List<Track> tracks, PlayerNotifier notifier) {
+    if (tracks.isEmpty) {
+      return _buildEmptyLibraryPrompt();
+    }
 
-  Widget _buildFolderRow(String title, String path, int trackCount) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.cardHover,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(LucideIcons.folder, color: AppColors.accent, size: 20),
+    final Map<String, List<Track>> folderMap = {};
+    for (final t in tracks) {
+      final f = File(t.filePath);
+      final parentDir = f.parent.path;
+      folderMap.putIfAbsent(parentDir, () => []).add(t);
+    }
+
+    final folderPaths = folderMap.keys.toList()..sort();
+
+    return ListView.separated(
+      itemCount: folderPaths.length,
+      separatorBuilder: (ctx, i) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final path = folderPaths[index];
+        final folderTracks = folderMap[path]!;
+        final dirName = path.split(RegExp(r'[\\/]')).lastWhere((s) => s.isNotEmpty, orElse: () => path);
+
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.subtleHairline),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.cardHover,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  path,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 11,
-                  ),
+                child: const Icon(LucideIcons.folder, color: AppColors.accent, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      dirName,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      path,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${folderTracks.length} tracks in folder',
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.playButtonBg,
+                  foregroundColor: AppColors.playButtonIcon,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                ),
+                onPressed: () {
+                  notifier.loadAndPlayQueue(folderTracks);
+                  AppToast.show(context, 'Playing folder: "$dirName"', icon: LucideIcons.play);
+                },
+                icon: const Icon(LucideIcons.play, size: 14),
+                label: const Text('Play All', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+              ),
+            ],
           ),
-          Text(
-            '$trackCount tracks',
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

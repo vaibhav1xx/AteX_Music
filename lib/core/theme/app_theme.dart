@@ -1,23 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
+import 'theme_provider.dart';
 
 class AppTheme {
   AppTheme._();
 
   static ThemeData get darkTheme {
+    return buildTheme(const ThemeState());
+  }
+
+  static ThemeData buildTheme(ThemeState themeState) {
     final baseTextTheme = GoogleFonts.plusJakartaSansTextTheme();
+    final effectiveCanvas = themeState.canvas;
+    final effectiveCard = themeState.card;
+    final effectiveAccent = themeState.effectiveAccent;
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: AppColors.canvas,
-      canvasColor: AppColors.canvas,
-      primaryColor: AppColors.accent,
-      colorScheme: const ColorScheme.dark(
-        primary: AppColors.accent,
+      scaffoldBackgroundColor: effectiveCanvas,
+      canvasColor: effectiveCanvas,
+      primaryColor: effectiveAccent,
+      colorScheme: ColorScheme.dark(
+        primary: effectiveAccent,
         onPrimary: AppColors.playButtonIcon,
-        surface: AppColors.card,
+        surface: effectiveCard,
         onSurface: AppColors.textPrimary,
       ),
       appBarTheme: const AppBarTheme(
@@ -32,12 +40,12 @@ class AppTheme {
           letterSpacing: -0.3,
         ),
       ),
-      sliderTheme: const SliderThemeData(
-        activeTrackColor: AppColors.accent,
-        inactiveTrackColor: Color(0x26FFFFFF),
-        thumbColor: Color(0xFFFFFFFF),
-        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5),
-        overlayShape: RoundSliderOverlayShape(overlayRadius: 10),
+      sliderTheme: SliderThemeData(
+        activeTrackColor: effectiveAccent,
+        inactiveTrackColor: const Color(0x26FFFFFF),
+        thumbColor: const Color(0xFFFFFFFF),
+        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+        overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
         trackHeight: 3.0,
       ),
       textTheme: baseTextTheme.copyWith(

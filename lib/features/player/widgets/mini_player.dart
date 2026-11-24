@@ -6,6 +6,8 @@ import '../../../data/models/track.dart';
 import '../providers/player_provider.dart';
 import 'album_art_view.dart';
 import 'now_playing_screen.dart';
+import 'playback_effects_sheet.dart';
+import 'track_info_sheet.dart';
 
 class MiniPlayer extends ConsumerWidget {
   final bool isDesktopDock;
@@ -113,6 +115,11 @@ class MiniPlayer extends ConsumerWidget {
                           ),
                         ],
                       ),
+                    ),
+                    IconButton(
+                      tooltip: 'Pro Controls',
+                      icon: const Icon(LucideIcons.slidersHorizontal, size: 16, color: AppColors.textMuted),
+                      onPressed: () => showPlaybackEffectsSheet(context, ref),
                     ),
                     IconButton(
                       icon: Icon(
@@ -359,12 +366,32 @@ class MiniPlayer extends ConsumerWidget {
             ),
           ),
 
-          // Right (30%): Lyrics, Queue, Equalizer, Volume, Fullscreen
+          // Right (30%): Speed/Effects, Track Inspector, Lyrics, Queue, Volume, Fullscreen
           Expanded(
             flex: 3,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                IconButton(
+                  tooltip: 'Speed, Pitch & Sleep Timer',
+                  icon: Icon(
+                    LucideIcons.slidersHorizontal,
+                    size: 16,
+                    color: (playerState.speed != 1.0 || playerState.pitch != 1.0 || playerState.skipSilence || playerState.sleepTimerMinutesRemaining != null)
+                        ? AppColors.accent
+                        : AppColors.textMuted,
+                  ),
+                  onPressed: () => showPlaybackEffectsSheet(context, ref),
+                ),
+                IconButton(
+                  tooltip: 'Track Info & Audio Inspector',
+                  icon: const Icon(
+                    LucideIcons.info,
+                    size: 16,
+                    color: AppColors.textMuted,
+                  ),
+                  onPressed: () => showTrackInfoSheet(context, track),
+                ),
                 IconButton(
                   tooltip: 'Lyrics',
                   icon: Icon(
@@ -390,7 +417,7 @@ class MiniPlayer extends ConsumerWidget {
                   size: 16,
                 ),
                 SizedBox(
-                  width: 76,
+                  width: 72,
                   child: SliderTheme(
                     data: SliderTheme.of(context).copyWith(
                       trackHeight: 2.5,

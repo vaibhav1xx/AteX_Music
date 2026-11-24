@@ -1,8 +1,11 @@
+import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/theme_provider.dart';
 import '../../core/widgets/atex_monogram.dart';
 import '../../core/widgets/desktop_title_bar.dart';
 import '../../core/widgets/track_action_menu.dart';
@@ -73,27 +76,63 @@ class _AppShellState extends ConsumerState<AppShell> {
       child: FocusScope(
         autofocus: true,
         child: Scaffold(
-          backgroundColor: AppColors.canvas,
+          backgroundColor: Colors.transparent,
           body: LayoutBuilder(
             builder: (context, constraints) {
               final isDesktop = constraints.maxWidth >= 700;
-              return Column(
+              final themeState = ref.watch(themeProvider);
+              final wallpaperPath = themeState.customWallpaperPath;
+              final hasWallpaper = wallpaperPath != null && File(wallpaperPath).existsSync();
+
+              return Stack(
                 children: [
-                  // Integrated Frameless Desktop Drag Titlebar (Windows & macOS on desktop widths)
-                  if (DesktopTitleBar.isSupported && isDesktop)
-                    DesktopTitleBar(
-                      onSearchTap: () => setState(() => _currentIndex = 1),
+                  // Custom Background Wallpaper (with adjustable Gaussian blur & dim overlay)
+                  if (hasWallpaper) ...[
+                    Positioned.fill(
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: themeState.wallpaperBlur,
+                          sigmaY: themeState.wallpaperBlur,
+                        ),
+                        child: Image.file(
+                          File(wallpaperPath),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black.withAlpha((themeState.wallpaperDim * 255).toInt()),
+                      ),
+                    ),
+                  ] else ...[
+                    Positioned.fill(
+                      child: Container(color: themeState.canvas),
+                    ),
+                  ],
 
-                  // In-App Update Banner (dismissible)
-                  if (updateInfo != null && updateInfo.hasUpdate && !_updateBannerDismissed)
-                    _buildUpdateBanner(updateInfo),
+                  // Main App Layout
+                  Positioned.fill(
+                    child: Column(
+                      children: [
+                        // Integrated Frameless Desktop Drag Titlebar (Windows & macOS on desktop widths)
+                        if (DesktopTitleBar.isSupported && isDesktop)
+                          DesktopTitleBar(
+                            onSearchTap: () => setState(() => _currentIndex = 1),
+                          ),
 
-                  // Main Responsive Layout
-                  Expanded(
-                    child: isDesktop
-                        ? _buildDesktopLayout(context)
-                        : _buildMobileLayout(context),
+                        // In-App Update Banner (dismissible)
+                        if (updateInfo != null && updateInfo.hasUpdate && !_updateBannerDismissed)
+                          _buildUpdateBanner(updateInfo),
+
+                        // Main Responsive Layout
+                        Expanded(
+                          child: isDesktop
+                              ? _buildDesktopLayout(context)
+                              : _buildMobileLayout(context),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               );
@@ -290,6 +329,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                     _buildSidebarItem(2, LucideIcons.library, 'Library'),
                     const SizedBox(height: 4),
                     _buildSidebarItem(3, LucideIcons.settings, 'Settings'),
+                    const SizedBox(height: 4),
+                    _buildSidebarItem(4, LucideIcons.flame, 'Rewind & Stats'),
 
                     const SizedBox(height: 28),
                     Padding(
@@ -385,13 +426,17 @@ class _AppShellState extends ConsumerState<AppShell> {
               size: 18,
             ),
             const SizedBox(width: 14),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                fontSize: 13,
-                letterSpacing: -0.2,
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 13,
+                  letterSpacing: -0.2,
+                ),
               ),
             ),
           ],

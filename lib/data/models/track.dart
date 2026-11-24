@@ -15,6 +15,10 @@ class Track {
   final bool isFavorite;
   final bool hasLyrics;
   final DateTime? dateAdded;
+  final int playCount;
+  final DateTime? lastPlayedAt;
+
+  DateTime? get lastPlayed => lastPlayedAt;
 
   const Track({
     required this.id,
@@ -30,6 +34,8 @@ class Track {
     this.isFavorite = false,
     this.hasLyrics = true,
     this.dateAdded,
+    this.playCount = 0,
+    this.lastPlayedAt,
   });
 
   Track copyWith({
@@ -46,6 +52,8 @@ class Track {
     bool? isFavorite,
     bool? hasLyrics,
     DateTime? dateAdded,
+    int? playCount,
+    DateTime? lastPlayedAt,
   }) {
     return Track(
       id: id ?? this.id,
@@ -61,6 +69,8 @@ class Track {
       isFavorite: isFavorite ?? this.isFavorite,
       hasLyrics: hasLyrics ?? this.hasLyrics,
       dateAdded: dateAdded ?? this.dateAdded,
+      playCount: playCount ?? this.playCount,
+      lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
     );
   }
 
@@ -79,6 +89,8 @@ class Track {
       isFavorite: db.isFavorite,
       hasLyrics: db.localLyricsPath != null && db.localLyricsPath!.isNotEmpty,
       dateAdded: db.dateAdded,
+      playCount: db.playCount,
+      lastPlayedAt: db.lastPlayedAt,
     );
   }
 
@@ -94,6 +106,8 @@ class Track {
       localLyricsPath: Value(localLyricsPath),
       isFavorite: Value(isFavorite),
       dateAdded: dateAdded != null ? Value(dateAdded!) : const Value.absent(),
+      playCount: Value(playCount),
+      lastPlayedAt: Value(lastPlayedAt),
     );
   }
 

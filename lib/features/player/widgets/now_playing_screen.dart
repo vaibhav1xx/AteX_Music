@@ -5,10 +5,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/theme_provider.dart';
+import '../../../core/widgets/track_action_menu.dart';
 import '../../../data/models/synced_lyric.dart';
 import '../../../data/models/track.dart';
 import '../providers/player_provider.dart';
 import 'album_art_view.dart';
+import 'audio_visualizer.dart';
+import 'playback_effects_sheet.dart';
+import 'track_info_sheet.dart';
+
+enum NowPlayingViewMode { cover, visualizer, lyrics }
 
 class NowPlayingScreen extends ConsumerStatefulWidget {
   const NowPlayingScreen({super.key});
@@ -21,6 +28,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   final ScrollController _lyricsScrollController = ScrollController();
   int _lastActiveIndex = -1;
   bool _mobileShowLyrics = false;
+  String? _lastTrackId;
+  NowPlayingViewMode _viewMode = NowPlayingViewMode.cover;
 
   static const String _defaultLrc = '''
 [00:00.00] (Instrumental Intro)
@@ -61,6 +70,18 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     final track = playerState.currentTrack;
     final notifier = ref.read(playerProvider.notifier);
     final isDesktop = MediaQuery.sizeOf(context).width >= 700;
+
+    final themeState = ref.watch(themeProvider);
+    final effectiveAccent = themeState.effectiveAccent;
+
+    if (_lastTrackId != track.id) {
+      _lastTrackId = track.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(themeProvider.notifier).updateAccentFromTrack(track);
+        }
+      });
+    }
 
     // Parse lyrics from local file if available or default LRC
     String lrcText = _defaultLrc;
@@ -114,10 +135,10 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                       ),
                       Column(
                         children: [
-                          const Text(
+                          Text(
                             'PLAYING FROM OFFLINE ENGINE',
                             style: TextStyle(
-                              color: AppColors.accent,
+                              color: effectiveAccent,
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 1.2,
@@ -134,24 +155,52 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                           ),
                         ],
                       ),
-                      IconButton(
-                        icon: const Icon(LucideIcons.moreVertical, size: 20, color: AppColors.textPrimary),
-                        onPressed: () => _showTrackOptions(context, track),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: 'Speed & Sleep Timer',
+                            icon: Icon(
+                              LucideIcons.slidersHorizontal,
+                              size: 19,
+                              color: (playerState.speed != 1.0 || playerState.pitch != 1.0 || playerState.skipSilence || playerState.sleepTimerMinutesRemaining != null)
+                                  ? effectiveAccent
+                                  : AppColors.textPrimary,
+                            ),
+                            onPressed: () => showPlaybackEffectsSheet(context, ref),
+                          ),
+                          IconButton(
+                            tooltip: 'Track Inspector & Options',
+                            icon: const Icon(LucideIcons.moreVertical, size: 20, color: AppColors.textPrimary),
+                            onPressed: () => showTrackActionMenu(context, ref, track),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
+
+                // Togglable Segmented Control: [ Cover Art | Visualizer | Synced Lyrics ]
+                _buildModeSegmentedControl(effectiveAccent),
 
                 // Main Content (Dual column on desktop; switchable on mobile)
                 Expanded(
                   child: isDesktop
                       ? Row(
                           children: [
-                            // Left: Album Art & Details
+                            // Left: Album Art or Audio Visualizer
                             Expanded(
                               flex: 5,
                               child: Center(
-                                child: _buildCoverArea(track, 360),
+                                child: _viewMode == NowPlayingViewMode.visualizer
+                                    ? AudioVisualizerView(
+                                        isPlaying: playerState.isPlaying,
+                                        position: playerState.position,
+                                        accentColor: effectiveAccent,
+                                        track: track,
+                                        size: 360,
+                                      )
+                                    : _buildCoverArea(track, 360),
                               ),
                             ),
                             // Right: Karaoke Synced Lyrics
@@ -159,18 +208,28 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                               flex: 6,
                               child: Padding(
                                 padding: const EdgeInsets.only(right: 48, top: 20, bottom: 20),
-                                child: _buildLyricsList(lyrics, activeIndex),
+                                child: _buildLyricsList(lyrics, activeIndex, effectiveAccent),
                               ),
                             ),
                           ],
                         )
                       : Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: _mobileShowLyrics
-                              ? _buildLyricsList(lyrics, activeIndex)
-                              : Center(
-                                  child: _buildCoverArea(track, (MediaQuery.sizeOf(context).width * 0.78).clamp(240.0, 360.0)),
+                          child: switch (_viewMode) {
+                            NowPlayingViewMode.visualizer => Center(
+                                child: AudioVisualizerView(
+                                  isPlaying: playerState.isPlaying,
+                                  position: playerState.position,
+                                  accentColor: effectiveAccent,
+                                  track: track,
+                                  size: (MediaQuery.sizeOf(context).width * 0.82).clamp(260.0, 360.0),
                                 ),
+                              ),
+                            NowPlayingViewMode.lyrics => _buildLyricsList(lyrics, activeIndex, effectiveAccent),
+                            NowPlayingViewMode.cover => Center(
+                                child: _buildCoverArea(track, (MediaQuery.sizeOf(context).width * 0.78).clamp(240.0, 360.0)),
+                              ),
+                          },
                         ),
                 ),
 
@@ -212,6 +271,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                   ),
                                 ],
                               ),
+                            ),
+                            IconButton(
+                              tooltip: 'Track Info & Audio Inspector',
+                              icon: const Icon(LucideIcons.info, size: 20, color: AppColors.textMuted),
+                              onPressed: () => showTrackInfoSheet(context, track),
                             ),
                             IconButton(
                               icon: Icon(
@@ -406,7 +470,63 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     );
   }
 
-  Widget _buildLyricsList(List<SyncedLyricLine> lines, int activeIndex) {
+  Widget _buildModeSegmentedControl(Color accent) {
+    return Container(
+      margin: const EdgeInsets.only(top: 2, bottom: 10),
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withAlpha(20), width: 1.0),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildSegmentItem(NowPlayingViewMode.cover, LucideIcons.disc, 'Cover', accent),
+          _buildSegmentItem(NowPlayingViewMode.visualizer, LucideIcons.activity, 'Visualizer', accent),
+          _buildSegmentItem(NowPlayingViewMode.lyrics, LucideIcons.mic2, 'Lyrics', accent),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSegmentItem(NowPlayingViewMode mode, IconData icon, String label, Color accent) {
+    final isSelected = _viewMode == mode;
+    return GestureDetector(
+      onTap: () => setState(() => _viewMode = mode),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? Colors.black : Colors.white.withAlpha(180),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.black : Colors.white.withAlpha(180),
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLyricsList(List<SyncedLyricLine> lines, int activeIndex, [Color? accent]) {
+    final effectiveAccent = accent ?? AppColors.accent;
     if (lines.isEmpty) {
       return const Center(
         child: Text(
@@ -429,7 +549,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
           child: Text(
             line.text,
             style: TextStyle(
-              color: isActive ? AppColors.accent : AppColors.textMuted.withAlpha(140),
+              color: isActive ? effectiveAccent : AppColors.textMuted.withAlpha(140),
               fontSize: isActive ? 22 : 16,
               fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
               letterSpacing: isActive ? -0.4 : 0,
@@ -444,32 +564,5 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     final m = d.inMinutes;
     final s = d.inSeconds.remainder(60);
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
-
-  void _showTrackOptions(BuildContext context, Track track) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.cardHover,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(LucideIcons.info, color: AppColors.accent, size: 20),
-              title: const Text('Track Source'),
-              subtitle: Text(track.filePath, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-            ),
-            ListTile(
-              leading: const Icon(LucideIcons.listPlus, size: 20, color: AppColors.textPrimary),
-              title: const Text('Add to Local Playlist'),
-              onTap: () => Navigator.pop(ctx),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

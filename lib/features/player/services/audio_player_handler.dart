@@ -13,8 +13,16 @@ abstract class AudioPlayerHandler extends BaseAudioHandler {
   Future<void> insertTrack(int index, Track track);
   Future<void> addTrack(Track track);
   Future<void> setVolume(double volume);
+  Future<void> setPitch(double pitch);
+  Future<void> setSkipSilence(bool enabled);
   Stream<Duration> get positionStream;
   Stream<Duration?> get durationStream;
+  Stream<double> get speedStream;
+  Stream<double> get pitchStream;
+  Stream<bool> get skipSilenceStream;
+  double get currentSpeed;
+  double get currentPitch;
+  bool get currentSkipSilence;
   AudioPlayer get player;
 }
 
@@ -22,9 +30,20 @@ class AudioPlayerHandlerImpl extends AudioPlayerHandler {
   final AudioPlayer _player = AudioPlayer();
   List<Track> _tracks = [];
   ConcatenatingAudioSource _playlist = ConcatenatingAudioSource(children: []);
+  double _pitch = 1.0;
+  bool _skipSilence = false;
 
   @override
   AudioPlayer get player => _player;
+
+  @override
+  double get currentSpeed => _player.speed;
+
+  @override
+  double get currentPitch => _pitch;
+
+  @override
+  bool get currentSkipSilence => _skipSilence;
 
   AudioPlayerHandlerImpl() {
     _init();
@@ -35,6 +54,12 @@ class AudioPlayerHandlerImpl extends AudioPlayerHandler {
     try {
       final session = await AudioSession.instance;
       await session.configure(const AudioSessionConfiguration.music());
+
+      // Auto-pause when headphones unplugged / Bluetooth disconnected
+      session.becomingNoisyEventStream.listen((_) {
+        debugPrint('Audio session becoming noisy: pausing playback');
+        pause();
+      });
     } catch (e) {
       debugPrint('AudioSession configuration error: $e');
     }
@@ -62,6 +87,15 @@ class AudioPlayerHandlerImpl extends AudioPlayerHandler {
 
   @override
   Stream<Duration?> get durationStream => _player.durationStream;
+
+  @override
+  Stream<double> get speedStream => _player.speedStream;
+
+  @override
+  Stream<double> get pitchStream => _player.pitchStream;
+
+  @override
+  Stream<bool> get skipSilenceStream => _player.skipSilenceEnabledStream;
 
   @override
   Future<void> loadQueue(List<Track> tracks, {int initialIndex = 0, bool autoPlay = true}) async {
@@ -153,7 +187,9 @@ class AudioPlayerHandlerImpl extends AudioPlayerHandler {
       duration: track.duration,
       artUri: track.localCoverPath != null && File(track.localCoverPath!).existsSync()
           ? Uri.file(track.localCoverPath!)
-          : null,
+          : (track.localCoverPath != null && track.localCoverPath!.startsWith('http')
+              ? Uri.tryParse(track.localCoverPath!)
+              : null),
       extras: {
         'filePath': track.filePath,
         'genre': track.genre,
@@ -220,7 +256,35 @@ class AudioPlayerHandlerImpl extends AudioPlayerHandler {
   }
 
   @override
-  Future<void> setSpeed(double speed) => _player.setSpeed(speed);
+  Future<void> setSpeed(double speed) async {
+    try {
+      final clamped = speed.clamp(0.5, 2.0);
+      await _player.setSpeed(clamped);
+    } catch (e) {
+      debugPrint('setSpeed graceful fallback: $e');
+    }
+  }
+
+  @override
+  Future<void> setPitch(double pitch) async {
+    try {
+      final clamped = pitch.clamp(0.5, 1.5);
+      _pitch = clamped;
+      await _player.setPitch(clamped);
+    } catch (e) {
+      debugPrint('setPitch graceful fallback: $e');
+    }
+  }
+
+  @override
+  Future<void> setSkipSilence(bool enabled) async {
+    try {
+      _skipSilence = enabled;
+      await _player.setSkipSilenceEnabled(enabled);
+    } catch (e) {
+      debugPrint('setSkipSilenceEnabled graceful fallback: $e');
+    }
+  }
 
   @override
   Future<void> setVolume(double volume) => _player.setVolume(volume);

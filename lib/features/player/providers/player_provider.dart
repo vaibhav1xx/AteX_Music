@@ -15,6 +15,11 @@ class PlayerState {
   final bool isShuffle;
   final PlaybackRepeatMode repeatMode;
   final double volume;
+  final double speed;
+  final double pitch;
+  final bool skipSilence;
+  final int? sleepTimerMinutesRemaining;
+  final DateTime? sleepTimerEndTime;
   final List<Track> queue;
   final int queueIndex;
   final bool isLyricsVisible;
@@ -27,6 +32,11 @@ class PlayerState {
     this.isShuffle = false,
     this.repeatMode = PlaybackRepeatMode.all,
     this.volume = 1.0,
+    this.speed = 1.0,
+    this.pitch = 1.0,
+    this.skipSilence = false,
+    this.sleepTimerMinutesRemaining,
+    this.sleepTimerEndTime,
     required this.queue,
     this.queueIndex = 0,
     this.isLyricsVisible = false,
@@ -40,6 +50,12 @@ class PlayerState {
     bool? isShuffle,
     PlaybackRepeatMode? repeatMode,
     double? volume,
+    double? speed,
+    double? pitch,
+    bool? skipSilence,
+    int? sleepTimerMinutesRemaining,
+    DateTime? sleepTimerEndTime,
+    bool clearSleepTimer = false,
     List<Track>? queue,
     int? queueIndex,
     bool? isLyricsVisible,
@@ -52,6 +68,13 @@ class PlayerState {
       isShuffle: isShuffle ?? this.isShuffle,
       repeatMode: repeatMode ?? this.repeatMode,
       volume: volume ?? this.volume,
+      speed: speed ?? this.speed,
+      pitch: pitch ?? this.pitch,
+      skipSilence: skipSilence ?? this.skipSilence,
+      sleepTimerMinutesRemaining:
+          clearSleepTimer ? null : (sleepTimerMinutesRemaining ?? this.sleepTimerMinutesRemaining),
+      sleepTimerEndTime:
+          clearSleepTimer ? null : (sleepTimerEndTime ?? this.sleepTimerEndTime),
       queue: queue ?? this.queue,
       queueIndex: queueIndex ?? this.queueIndex,
       isLyricsVisible: isLyricsVisible ?? this.isLyricsVisible,
@@ -77,6 +100,13 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
   StreamSubscription? _positionSub;
   StreamSubscription? _durationSub;
   StreamSubscription? _mediaItemSub;
+  StreamSubscription? _speedSub;
+
+  Timer? _sleepTimer;
+  Timer? _sleepTicker;
+
+  bool _hasRecordedCurrentPlay = false;
+  String? _lastTrackIdRecorded;
 
   static const idleTrack = Track(
     id: 'idle',
@@ -111,12 +141,29 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
       state = state.copyWith(
         isPlaying: isPlaying,
         queueIndex: qIndex,
+        speed: playbackState.speed,
       );
     });
 
     // 2. Real-time audio playback position stream
     _positionSub = _audioHandler.positionStream.listen((pos) {
       state = state.copyWith(position: pos);
+
+      // Automatically record a play event whenever a track plays for more than 20 seconds
+      if (!_hasRecordedCurrentPlay &&
+          state.isPlaying &&
+          pos.inSeconds >= 20 &&
+          state.currentTrack.id != 'idle') {
+        _hasRecordedCurrentPlay = true;
+        _lastTrackIdRecorded = state.currentTrack.id;
+        _database.recordListeningEvent(
+          trackId: state.currentTrack.id,
+          title: state.currentTrack.title,
+          artist: state.currentTrack.artist,
+          artworkUrl: state.currentTrack.localCoverPath,
+          durationListenedMs: pos.inMilliseconds,
+        );
+      }
     });
 
     // 3. Track duration stream
@@ -126,13 +173,22 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
       }
     });
 
-    // 4. Current media item updates
+    // 4. Speed stream updates
+    _speedSub = _audioHandler.speedStream.listen((s) {
+      state = state.copyWith(speed: s);
+    });
+
+    // 5. Current media item updates
     _mediaItemSub = _audioHandler.mediaItem.listen((item) {
       if (item != null) {
+        if (_lastTrackIdRecorded != item.id) {
+          _hasRecordedCurrentPlay = false;
+        }
         final matchingIndex = state.queue.indexWhere((t) => t.id == item.id);
         if (matchingIndex >= 0) {
+          final matchedTrack = state.queue[matchingIndex];
           state = state.copyWith(
-            currentTrack: state.queue[matchingIndex],
+            currentTrack: matchedTrack,
             queueIndex: matchingIndex,
             duration: item.duration ?? state.duration,
           );
@@ -166,6 +222,8 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
   }
 
   Future<void> playTrack(Track track) async {
+    _hasRecordedCurrentPlay = false;
+    _lastTrackIdRecorded = track.id;
     final idx = state.queue.indexWhere((t) => t.id == track.id);
     state = state.copyWith(
       currentTrack: track,
@@ -178,6 +236,8 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
 
   Future<void> loadAndPlayQueue(List<Track> tracks, {int startIndex = 0}) async {
     if (tracks.isEmpty) return;
+    _hasRecordedCurrentPlay = false;
+    _lastTrackIdRecorded = tracks[startIndex].id;
     state = state.copyWith(
       queue: tracks,
       queueIndex: startIndex,
@@ -238,8 +298,16 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
       queue: updatedQueue,
     );
 
-    // Persist to local SQLite database
     await _database.toggleTrackFavorite(updated.id);
+  }
+
+  void updateTrackMetadata(Track updated) {
+    final updatedQueue = state.queue.map((t) => t.id == updated.id ? updated : t).toList();
+    final updatedCurrent = state.currentTrack.id == updated.id ? updated : state.currentTrack;
+    state = state.copyWith(
+      currentTrack: updatedCurrent,
+      queue: updatedQueue,
+    );
   }
 
   Future<void> toggleTrackFavorite(Track track) async {
@@ -318,12 +386,80 @@ class PlayerNotifier extends StateNotifier<PlayerState> {
     await _audioHandler.setVolume(clamped);
   }
 
+  // -------------------------------------------------------------
+  // Pro Playback Controls: Speed, Pitch, Skip Silence, Sleep Timer
+  // -------------------------------------------------------------
+  Future<void> setSpeed(double speed) async {
+    final clamped = speed.clamp(0.5, 2.0);
+    state = state.copyWith(speed: clamped);
+    await _audioHandler.setSpeed(clamped);
+  }
+
+  Future<void> setPitch(double pitch) async {
+    final clamped = pitch.clamp(0.5, 1.5);
+    state = state.copyWith(pitch: clamped);
+    await _audioHandler.setPitch(clamped);
+  }
+
+  Future<void> toggleSkipSilence() async {
+    final newValue = !state.skipSilence;
+    state = state.copyWith(skipSilence: newValue);
+    await _audioHandler.setSkipSilence(newValue);
+  }
+
+  Future<void> setSkipSilence(bool enabled) async {
+    state = state.copyWith(skipSilence: enabled);
+    await _audioHandler.setSkipSilence(enabled);
+  }
+
+  void setSleepTimer(int minutes) {
+    cancelSleepTimer();
+
+    if (minutes <= 0) return;
+
+    final endTime = DateTime.now().add(Duration(minutes: minutes));
+    state = state.copyWith(
+      sleepTimerMinutesRemaining: minutes,
+      sleepTimerEndTime: endTime,
+    );
+
+    // Periodic ticker to decrement minutes remaining
+    _sleepTicker = Timer.periodic(const Duration(seconds: 15), (timer) {
+      final now = DateTime.now();
+      final diff = endTime.difference(now);
+      if (diff.isNegative || diff.inSeconds <= 0) {
+        cancelSleepTimer();
+        togglePlayPause();
+      } else {
+        final minsLeft = (diff.inSeconds / 60).ceil();
+        state = state.copyWith(sleepTimerMinutesRemaining: minsLeft);
+      }
+    });
+
+    // Exact timer when sleep time is up
+    _sleepTimer = Timer(Duration(minutes: minutes), () {
+      cancelSleepTimer();
+      _audioHandler.pause();
+    });
+  }
+
+  void cancelSleepTimer() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepTicker?.cancel();
+    _sleepTicker = null;
+    state = state.copyWith(clearSleepTimer: true);
+  }
+
   @override
   void dispose() {
     _playbackStateSub?.cancel();
     _positionSub?.cancel();
     _durationSub?.cancel();
     _mediaItemSub?.cancel();
+    _speedSub?.cancel();
+    _sleepTimer?.cancel();
+    _sleepTicker?.cancel();
     super.dispose();
   }
 }

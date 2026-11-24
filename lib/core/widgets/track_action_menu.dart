@@ -5,9 +5,13 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../data/database/app_database.dart';
 import '../../data/models/track.dart';
 import '../../data/services/offline_download_service.dart';
+import '../../features/library/widgets/track_metadata_editor_dialog.dart';
 import '../../features/player/providers/player_provider.dart';
+import '../../features/player/widgets/track_info_sheet.dart';
+import '../services/share_card_service.dart';
 import '../theme/app_colors.dart';
 import 'app_toast.dart';
+import 'shareable_song_card.dart';
 
 /// Shows the track action menu (bottom sheet on mobile, modal popup on desktop)
 void showTrackActionMenu(BuildContext context, WidgetRef ref, Track track) {
@@ -41,24 +45,26 @@ class _TrackActionSheet extends StatelessWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.subtleHairline,
-                borderRadius: BorderRadius.circular(2),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.subtleHairline,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            _TrackHeader(track: track),
-            const SizedBox(height: 12),
-            const Divider(color: AppColors.dockHairline, height: 1),
-            const SizedBox(height: 8),
-            _ActionList(track: track, ref: ref),
-          ],
+              const SizedBox(height: 14),
+              _TrackHeader(track: track),
+              const SizedBox(height: 12),
+              const Divider(color: AppColors.dockHairline, height: 1),
+              const SizedBox(height: 8),
+              _ActionList(track: track, ref: ref),
+            ],
+          ),
         ),
       ),
     );
@@ -83,16 +89,18 @@ class _TrackActionDialog extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 380),
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _TrackHeader(track: track),
-              const SizedBox(height: 16),
-              const Divider(color: AppColors.dockHairline, height: 1),
-              const SizedBox(height: 8),
-              _ActionList(track: track, ref: ref),
-            ],
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _TrackHeader(track: track),
+                const SizedBox(height: 16),
+                const Divider(color: AppColors.dockHairline, height: 1),
+                const SizedBox(height: 8),
+                _ActionList(track: track, ref: ref),
+              ],
+            ),
           ),
         ),
       ),
@@ -191,6 +199,22 @@ class _ActionList extends StatelessWidget {
           },
         ),
         _ActionTile(
+          icon: LucideIcons.filePenLine,
+          title: 'Edit Metadata (Title / Artist / Album)',
+          onTap: () {
+            Navigator.pop(context);
+            showTrackMetadataEditorDialog(context, ref, track);
+          },
+        ),
+        _ActionTile(
+          icon: LucideIcons.info,
+          title: 'Track Info & Audio Inspector',
+          onTap: () {
+            Navigator.pop(context);
+            showTrackInfoSheet(context, track);
+          },
+        ),
+        _ActionTile(
           icon: track.isFavorite ? LucideIcons.heartCrack : LucideIcons.heart,
           iconColor: track.isFavorite ? Colors.redAccent : AppColors.accent,
           title: track.isFavorite ? 'Remove from Favorites' : 'Add to Favorites',
@@ -202,6 +226,15 @@ class _ActionList extends StatelessWidget {
               track.isFavorite ? 'Removed from Favorites' : 'Added to Favorites',
               icon: LucideIcons.heart,
             );
+          },
+        ),
+        _ActionTile(
+          icon: LucideIcons.share2,
+          iconColor: AppColors.accent,
+          title: 'Share Song Card (9:16 Glass)',
+          onTap: () {
+            Navigator.pop(context);
+            showShareSongCardDialog(context, track);
           },
         ),
         _ActionTile(
@@ -485,6 +518,112 @@ void showCreatePlaylistDialog(
             ),
           ),
         ),
+      );
+    },
+  );
+}
+
+/// Dialog to preview and share the 9:16 Song Card
+void showShareSongCardDialog(BuildContext context, Track track, {String? lyricsSnippet}) {
+  final cardKey = GlobalKey();
+
+  showDialog(
+    context: context,
+    builder: (ctx) {
+      bool isSharing = false;
+
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return Dialog(
+            backgroundColor: AppColors.sidebar,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: AppColors.subtleHairline),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360, maxHeight: 660),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Share Song Card',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(LucideIcons.x, size: 18, color: AppColors.textMuted),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: Center(
+                        child: RepaintBoundary(
+                          key: cardKey,
+                          child: ShareableSongCard(
+                            track: track,
+                            lyricsSnippet: lyricsSnippet,
+                            accentColor: AppColors.accent,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.accent,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: isSharing
+                            ? null
+                            : () async {
+                                setState(() => isSharing = true);
+                                try {
+                                  await ShareCardService.captureAndShare(
+                                    context,
+                                    cardKey,
+                                    filePrefix: 'atex_song',
+                                    subject: 'Listening to ${track.title} on AteX Music',
+                                    text: 'Now playing: "${track.title}" by ${track.artist} on AteX Music.',
+                                  );
+                                } finally {
+                                  if (ctx.mounted) {
+                                    setState(() => isSharing = false);
+                                  }
+                                }
+                              },
+                        icon: isSharing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                              )
+                            : const Icon(LucideIcons.share2, size: 16),
+                        label: Text(
+                          isSharing ? 'Generating...' : 'Share Card',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       );
     },
   );
